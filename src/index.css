@@ -15,4 +15,17 @@
   --color-gray-600: #616161;
   --color-gray-800: #2C3E50;
   --color-gray-900: #1A1A1A;
+  
+  --animate-fadeIn: fadeIn 200ms ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

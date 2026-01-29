@@ -3,3 +3,5 @@ export { default as Select } from './Select';
 export { default as TextArea } from './TextArea';
 export { default as Button } from './Button';
 export { default as ImageUpload } from './ImageUpload';
+export { default as PostBase } from './PostBase';
+export { default as PostDetailBase } from './PostDetailBase';
