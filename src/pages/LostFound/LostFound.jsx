@@ -1,6 +1,8 @@
 import { useForm } from 'react-hook-form';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { theme } from '../../theme';
+import { Button } from '../../page/Glow'; 
+import { SelectBetter } from '../../page/SelectBetter'; 
 
 const STATUS_OPTIONS = [
   { value: 'lost', label: 'Lost' },
@@ -16,6 +18,8 @@ const LostFound = () => {
     register,
     handleSubmit,
     setValue,
+    watch,
+    trigger, // Added trigger for manual validation of custom select
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
@@ -23,9 +27,22 @@ const LostFound = () => {
     },
   });
 
+  const watchedStatus = watch('status');
+
+  // Register the custom select field
+  useEffect(() => {
+    register('status', { required: 'Please select a status' });
+  }, [register]);
+
   const onSubmit = (data) => {
     console.log('Lost & Found submitted:', data);
     alert('Lost & Found submitted successfully!');
+  };
+
+  // Handler for SelectBetter
+  const handleSelectChange = (name, value) => {
+    setValue(name, value);
+    trigger(name);
   };
 
   const processFile = (file) => {
@@ -79,8 +96,9 @@ const LostFound = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Changed rounded-xl to rounded-full for inputs
   const inputStyles = `
-    w-full px-4 py-3.5 rounded-xl text-base
+    w-full px-4 py-3.5 rounded-full text-base
     bg-gray-50 border-2 border-transparent
     placeholder:text-gray-400
     outline-none transition-all duration-200
@@ -104,7 +122,7 @@ const LostFound = () => {
         >
           {/* Title */}
           <div className="mb-5">
-            <label className="text-sm font-semibold text-gray-800 block mb-1">
+            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Title<span className="text-red-500 ml-0.5">*</span>
             </label>
             <input
@@ -113,36 +131,29 @@ const LostFound = () => {
               placeholder="e.g., Black wallet, Room key, Water bottle"
               className={`${inputStyles} ${errors.title ? 'border-red-500' : ''}`}
             />
-            {errors.title && <span className="text-xs text-red-500 mt-1">{errors.title.message}</span>}
+            {errors.title && <span className="text-xs text-red-500 mt-1 ml-1">{errors.title.message}</span>}
           </div>
 
           {/* Status + Location */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-            {/* Status */}
+            
+            {/* Status (SelectBetter) */}
             <div>
-              <label className="text-sm font-semibold text-gray-800 block mb-1">Status</label>
-              <div className="relative">
-                <select
-                  {...register('status')}
-                  className={`${inputStyles} appearance-none pr-10 cursor-pointer`}
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="6,9 12,15 18,9" />
-                  </svg>
-                </span>
-              </div>
+              <SelectBetter
+                label="Status"
+                name="status"
+                placeholder="Select Status"
+                options={STATUS_OPTIONS}
+                value={watchedStatus}
+                onChange={(e) => handleSelectChange('status', e.target.value)}
+                error={errors.status?.message}
+                required
+              />
             </div>
 
             {/* Location */}
             <div>
-              <label className="text-sm font-semibold text-gray-800 block mb-1">Location</label>
+              <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">Location</label>
               <input
                 {...register('location')}
                 type="text"
@@ -154,27 +165,27 @@ const LostFound = () => {
 
           {/* Description */}
           <div className="mb-5">
-            <label className="text-sm font-semibold text-gray-800 block mb-1">Description</label>
+            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">Description</label>
             <textarea
               {...register('description')}
               placeholder="Add any details that can help identify the item..."
               rows={4}
-              className={`${inputStyles} min-h-[120px] resize-y`}
+              // Override with rounded-2xl for textareas
+              className={`${inputStyles} !rounded-2xl min-h-[120px] resize-y`}
             />
           </div>
 
           {/* Item Image (Optional) */}
           <div className="mb-6">
-            <label className="text-sm font-semibold text-gray-800 block mb-1">
+            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Item Image (Optional)
             </label>
 
-            {/* register so setValue('image', file) is part of form data */}
             <input {...register('image')} type="hidden" />
 
             <div
               className={`
-                relative overflow-hidden min-h-[160px] rounded-xl cursor-pointer
+                relative overflow-hidden min-h-[160px] rounded-2xl cursor-pointer
                 flex items-center justify-center transition-all duration-200
                 ${
                   imagePreview
@@ -208,7 +219,7 @@ const LostFound = () => {
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex justify-end">
                     <button
                       type="button"
-                      className="flex items-center gap-1 bg-red-500/90 hover:bg-red-500 text-white border-none rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-all"
+                      className="flex items-center gap-1 bg-red-500/90 hover:bg-red-500 text-white border-none rounded-full px-3 py-1.5 text-sm cursor-pointer transition-all"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeImage();
@@ -238,32 +249,11 @@ const LostFound = () => {
             </div>
           </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`
-              w-full inline-flex items-center justify-center gap-2
-              px-6 py-4 rounded-xl text-base font-semibold
-              cursor-pointer transition-all duration-200
-              ${theme.blueGrad} text-white ${theme.glow}
-              hover:shadow-[0_0_35px_rgba(0,229,255,0.75)]
-              focus-visible:outline-2 focus-visible:outline-[#00E5FF] focus-visible:outline-offset-2
-              disabled:opacity-50 disabled:cursor-not-allowed
-              active:scale-[0.98]
-            `}
-          >
+          {/* Submit Button */}
+          <Button type="submit" fullWidth disabled={isSubmitting}>
             {isSubmitting ? (
               <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  fill="none"
-                  strokeDasharray="31.4 31.4"
-                />
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" />
               </svg>
             ) : (
               <>
@@ -274,7 +264,7 @@ const LostFound = () => {
                 Submit
               </>
             )}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

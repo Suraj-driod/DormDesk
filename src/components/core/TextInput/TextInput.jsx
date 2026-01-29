@@ -27,7 +27,7 @@ const TextInput = ({
         name={name}
         type={type}
         className={`
-          w-full px-4 py-3.5 rounded-xl text-base
+          w-full px-4 py-3.5 rounded-full text-base
           bg-gray-50 border-2 border-transparent
           placeholder:text-gray-400
           outline-none transition-all duration-200

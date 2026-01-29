@@ -10,7 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@supabase/supabase-js": "^2.93.3",
+=======
+    "framer-motion": "^12.29.2",
+>>>>>>> 7f1963fdffac2cfe4f7bcb407097e63171bba02f
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.71.1"
