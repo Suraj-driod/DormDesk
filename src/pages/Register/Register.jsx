@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { TextInput, Select, Button, ImageUpload } from '../../components/core';
+import { TextInput, ImageUpload } from '../../components/core';
+import { Button } from '../../page/Glow.jsx'; 
 import { theme } from '../../theme';
+import { motion } from "framer-motion"; 
+import { UserPlus } from "lucide-react"; 
+import { SelectBetter } from '../../page/SelectBetter.jsx'; 
 
 const ROLE_OPTIONS = [
   { value: 'student', label: 'Student' },
@@ -53,35 +57,64 @@ const Register = ({ onNavigateToLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8F9FA] to-[#E0F7FA] p-4 flex justify-center">
-      <div className="w-full max-w-[600px] py-6">
+    <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(#f7fdff,#ffffff)] font-['Poppins',sans-serif] text-[#0f172a] p-4">
+      
+      <motion.div 
+        initial={{ opacity: 0, y: 30, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+        className="w-full max-w-[650px] bg-white/70 backdrop-blur rounded-[28px] p-8 shadow-[0_0_40px_rgba(0,229,255,0.25)] border border-[#E6FBFF] my-10"
+      >
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Create Account</h1>
-          <p className="text-base text-gray-600">Join DormDesk to manage your hostel experience</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: -15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.5 }}
+          className="text-center mb-8"
+        >
+           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00E5FF] to-[#00B8D4] shadow-[0_0_20px_rgba(0,229,255,0.4)] mb-4 text-white">
+            <UserPlus size={32} strokeWidth={2.5} />
+          </div>
+          <h1 className="text-[24px] font-semibold text-[#0f172a]">Create Account</h1>
+          <p className="text-[14px] text-[#64748B] mt-1">Join DormDesk to manage your hostel experience</p>
+        </motion.div>
 
         <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
+          
           {/* ID Card Upload Section */}
-          <section className={`${theme.glass} rounded-2xl p-6 ${theme.glow}`}>
+          <motion.section 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="bg-white/40 rounded-2xl p-4 border border-[#E6FBFF]"
+          >
             <ImageUpload
               label="Upload Hostel ID Card"
               helperText="Details like name, hostel, and room will be auto-filled using OCR"
               onChange={handleImageUpload}
               required
             />
-          </section>
+          </motion.section>
 
           {/* Divider */}
-          <div className="flex items-center gap-4 text-gray-400 text-xs uppercase tracking-wider">
-            <div className="flex-1 h-px bg-gray-200" />
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.25 }}
+            className="flex items-center gap-4 text-[#94A3B8] text-xs uppercase tracking-wider font-semibold"
+          >
+            <div className="flex-1 h-px bg-[#E2E8F0]" />
             <span>OR FILL MANUALLY</span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
+            <div className="flex-1 h-px bg-[#E2E8F0]" />
+          </motion.div>
 
           {/* Personal Information */}
-          <section className={`${theme.glass} rounded-2xl p-6 ${theme.glow}`}>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Personal Information</h2>
+          <motion.section 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <h2 className="text-sm font-bold text-[#00B8D4] uppercase tracking-wide mb-4 pl-1">Personal Information</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <TextInput
                 label="Full Name"
@@ -113,10 +146,12 @@ const Register = ({ onNavigateToLogin }) => {
                 required
                 autoComplete="email"
               />
-              <Select
+              
+              {/* Updated SelectBetter */}
+              <SelectBetter
                 label="Role"
                 name="role"
-                placeholder="Select your role"
+                placeholder="Select Role"
                 options={ROLE_OPTIONS}
                 value={formData.role}
                 onChange={handleChange}
@@ -124,11 +159,15 @@ const Register = ({ onNavigateToLogin }) => {
                 required
               />
             </div>
-          </section>
+          </motion.section>
 
           {/* Hostel Details */}
-          <section className={`${theme.glass} rounded-2xl p-6 ${theme.glow}`}>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Hostel Details</h2>
+          <motion.section
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             transition={{ delay: 0.4 }}
+          >
+            <h2 className="text-sm font-bold text-[#00B8D4] uppercase tracking-wide mb-4 pl-1">Hostel Details</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <TextInput
                 label="Hostel Name"
@@ -160,11 +199,15 @@ const Register = ({ onNavigateToLogin }) => {
                 onChange={handleChange}
               />
             </div>
-          </section>
+          </motion.section>
 
           {/* Security */}
-          <section className={`${theme.glass} rounded-2xl p-6 ${theme.glow}`}>
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Security</h2>
+          <motion.section
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             transition={{ delay: 0.5 }}
+          >
+            <h2 className="text-sm font-bold text-[#00B8D4] uppercase tracking-wide mb-4 pl-1">Security</h2>
             <TextInput
               label="Password"
               name="password"
@@ -176,22 +219,27 @@ const Register = ({ onNavigateToLogin }) => {
               required
               autoComplete="new-password"
             />
-          </section>
+          </motion.section>
 
           {/* Actions */}
-          <div className="flex flex-col items-center gap-4 pt-2">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="flex flex-col items-center gap-4 pt-4"
+          >
             <Button type="submit" fullWidth>
               Register
             </Button>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-[#64748B]">
               Already have an account?{' '}
-              <button type="button" onClick={onNavigateToLogin} className="text-[#00E5FF] font-semibold hover:text-[#00B8D4] hover:underline transition-colors bg-transparent border-none cursor-pointer p-0">
+              <button type="button" onClick={onNavigateToLogin} className="text-[#00B8D4] font-semibold hover:text-[#00E5FF] hover:underline transition-colors bg-transparent border-none cursor-pointer p-0">
                 Login
               </button>
             </p>
-          </div>
+          </motion.div>
         </form>
-      </div>
+      </motion.div>
     </div>
   );
 };

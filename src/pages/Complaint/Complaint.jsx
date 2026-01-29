@@ -1,6 +1,8 @@
 import { useForm } from 'react-hook-form';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { theme } from '../../theme';
+import { Button } from '../../page/Glow'; 
+import { SelectBetter } from '../../page/SelectBetter'; 
 
 const COMPLAINT_TYPES = [
   { value: 'caretaker', label: 'Caretaker' },
@@ -18,6 +20,8 @@ const Complaint = () => {
     register,
     handleSubmit,
     setValue,
+    watch,
+    trigger, // Added trigger for immediate validation on custom select
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
@@ -29,9 +33,23 @@ const Complaint = () => {
     },
   });
 
+  // Watch the select value for the custom component
+  const watchedComplaintType = watch('complaintType');
+
+  // Register custom select field
+  useEffect(() => {
+    register('complaintType', { required: 'Please select a complaint type' });
+  }, [register]);
+
   const onSubmit = (data) => {
     console.log('Complaint submitted:', data);
     alert('Complaint submitted successfully!');
+  };
+
+  // Handler for SelectBetter
+  const handleSelectChange = (name, value) => {
+    setValue(name, value);
+    trigger(name);
   };
 
   const handleFileChange = (e) => {
@@ -89,8 +107,9 @@ const Complaint = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // Updated to rounded-full for pill shape
   const inputStyles = `
-    w-full px-4 py-3.5 rounded-xl text-base
+    w-full px-4 py-3.5 rounded-full text-base
     bg-gray-50 border-2 border-transparent
     placeholder:text-gray-400
     outline-none transition-all duration-200
@@ -114,7 +133,7 @@ const Complaint = () => {
         >
           {/* Title */}
           <div className="mb-5">
-            <label className="text-sm font-semibold text-gray-800 block mb-1">
+            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Title<span className="text-red-500 ml-0.5">*</span>
             </label>
             <input
@@ -126,44 +145,29 @@ const Complaint = () => {
               placeholder="Brief complaint title"
               className={`${inputStyles} ${errors.title ? 'border-red-500' : ''}`}
             />
-            {errors.title && <span className="text-xs text-red-500 mt-1">{errors.title.message}</span>}
+            {errors.title && <span className="text-xs text-red-500 mt-1 ml-1">{errors.title.message}</span>}
           </div>
 
           {/* Complaint Type + Accused Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-            {/* Complaint Type */}
+            
+            {/* Complaint Type (SelectBetter) */}
             <div>
-              <label className="text-sm font-semibold text-gray-800 block mb-1">
-                Complaint Type<span className="text-red-500 ml-0.5">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  {...register('complaintType', { required: 'Please select a complaint type' })}
-                  className={`${inputStyles} appearance-none pr-10 cursor-pointer ${
-                    errors.complaintType ? 'border-red-500' : ''
-                  }`}
-                >
-                  <option value="">Select type</option>
-                  {COMPLAINT_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-600">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="6,9 12,15 18,9" />
-                  </svg>
-                </span>
-              </div>
-              {errors.complaintType && (
-                <span className="text-xs text-red-500 mt-1">{errors.complaintType.message}</span>
-              )}
+              <SelectBetter
+                label="Complaint Type"
+                name="complaintType"
+                placeholder="Select type"
+                options={COMPLAINT_TYPES}
+                value={watchedComplaintType}
+                onChange={(e) => handleSelectChange('complaintType', e.target.value)}
+                error={errors.complaintType?.message}
+                required
+              />
             </div>
 
             {/* Accused Name */}
             <div>
-              <label className="text-sm font-semibold text-gray-800 block mb-1">
+              <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                 Accused Name<span className="text-red-500 ml-0.5">*</span>
               </label>
               <input
@@ -176,14 +180,14 @@ const Complaint = () => {
                 className={`${inputStyles} ${errors.accusedName ? 'border-red-500' : ''}`}
               />
               {errors.accusedName && (
-                <span className="text-xs text-red-500 mt-1">{errors.accusedName.message}</span>
+                <span className="text-xs text-red-500 mt-1 ml-1">{errors.accusedName.message}</span>
               )}
             </div>
           </div>
 
           {/* Description */}
           <div className="mb-5">
-            <label className="text-sm font-semibold text-gray-800 block mb-1">
+            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Description<span className="text-red-500 ml-0.5">*</span>
             </label>
             <textarea
@@ -193,27 +197,27 @@ const Complaint = () => {
               })}
               placeholder="Describe the complaint in detail..."
               rows={4}
-              className={`${inputStyles} min-h-[120px] resize-y ${
+              // Override rounded-full with rounded-2xl for textareas
+              className={`${inputStyles} !rounded-2xl min-h-[120px] resize-y ${
                 errors.description ? 'border-red-500' : ''
               }`}
             />
             {errors.description && (
-              <span className="text-xs text-red-500 mt-1">{errors.description.message}</span>
+              <span className="text-xs text-red-500 mt-1 ml-1">{errors.description.message}</span>
             )}
           </div>
 
           {/* Media Proof (Optional) */}
           <div className="mb-5">
-            <label className="text-sm font-semibold text-gray-800 block mb-1">
+            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Media Proof (Optional)
             </label>
 
-            {/* register so setValue('media', file) is part of form data */}
             <input {...register('media')} type="hidden" />
 
             <div
               className={`
-                relative overflow-hidden min-h-[160px] rounded-xl cursor-pointer
+                relative overflow-hidden min-h-[160px] rounded-2xl cursor-pointer
                 flex items-center justify-center transition-all duration-200
                 ${
                   mediaPreview
@@ -256,7 +260,7 @@ const Complaint = () => {
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex justify-end">
                     <button
                       type="button"
-                      className="flex items-center gap-1 bg-red-500/90 hover:bg-red-500 text-white border-none rounded-lg px-3 py-1.5 text-sm cursor-pointer transition-all"
+                      className="flex items-center gap-1 bg-red-500/90 hover:bg-red-500 text-white border-none rounded-full px-3 py-1.5 text-sm cursor-pointer transition-all"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeMedia();
@@ -288,7 +292,7 @@ const Complaint = () => {
 
           {/* Incident Date & Time (Optional) */}
           <div className="mb-6">
-            <label className="text-sm font-semibold text-gray-800 block mb-1">
+            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Incident Date & Time (Optional)
             </label>
             <input
@@ -297,35 +301,14 @@ const Complaint = () => {
               readOnly
               className={`${inputStyles} bg-gray-100 cursor-not-allowed`}
             />
-            <span className="text-xs text-gray-400 mt-1 block">Auto-filled based on current time</span>
+            <span className="text-xs text-gray-400 mt-1 block ml-1">Auto-filled based on current time</span>
           </div>
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`
-              w-full inline-flex items-center justify-center gap-2
-              px-6 py-4 rounded-xl text-base font-semibold
-              cursor-pointer transition-all duration-200
-              ${theme.blueGrad} text-white ${theme.glow}
-              hover:shadow-[0_0_35px_rgba(0,229,255,0.75)]
-              focus-visible:outline-2 focus-visible:outline-[#00E5FF] focus-visible:outline-offset-2
-              disabled:opacity-50 disabled:cursor-not-allowed
-              active:scale-[0.98]
-            `}
-          >
+          {/* Submit Button */}
+          <Button type="submit" fullWidth disabled={isSubmitting}>
             {isSubmitting ? (
               <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  fill="none"
-                  strokeDasharray="31.4 31.4"
-                />
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" strokeDasharray="31.4 31.4" />
               </svg>
             ) : (
               <>
@@ -336,7 +319,7 @@ const Complaint = () => {
                 Submit Complaint
               </>
             )}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

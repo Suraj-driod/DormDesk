@@ -5,9 +5,13 @@ import ReportIssue from './pages/ReportIssue';
 import Complaint from './pages/Complaint';
 import LostFound from './pages/LostFound';
 import PostDemo from './pages/PostDemo';
+import Dashboard from './pages/Dashboard/Dashboard';
+import Profile from './pages/Profile/Profile';    
+import Issues from './pages/Issues/Issues';
+import Feed from './pages/Feed/Feed';
 
 function App() {
-  const [page, setPage] = useState('postdemo'); // Changed default to show PostDemo
+  const [page, setPage] = useState('dashboard'); // Changed default to show PostDemo
 
   if (page === 'login') {
     return <Login onNavigateToRegister={() => setPage('register')} />;
@@ -32,6 +36,23 @@ function App() {
   if (page === 'postdemo') {
     return <PostDemo />;
   }
+  
+  if (page === 'dashboard') {
+    return <Dashboard />;
+  } 
+
+  if (page === 'profile') {
+    return <Profile  />;
+  }
+
+  if (page === 'issues') {
+    return <Issues />;
+  } 
+
+  if (page === 'feed') {
+    return <Feed />;
+  }
+  
 
   return <Register onNavigateToLogin={() => setPage('login')} />;
 }

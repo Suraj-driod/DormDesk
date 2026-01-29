@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 @theme {
+   --font-ui: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+
   --font-family-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   
   --color-cyan-bright: #00E5FF;
@@ -28,4 +30,8 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+body {
+  font-family: var(--font-ui);
 }

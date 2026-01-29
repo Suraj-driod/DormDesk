@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, isValidElement } from 'react';
 
 const PostBase = ({
   // Header props
@@ -74,7 +74,12 @@ const PostBase = ({
   );
 
   const getStatusColor = (label) => {
-    const normalizedLabel = label?.toLowerCase() || '';
+    // Safety check: ensure label is a string
+    if (!label || typeof label !== 'string') {
+        return { dot: 'bg-gray-400', text: 'text-gray-600', line: 'bg-gray-200' };
+    }
+
+    const normalizedLabel = label.toLowerCase();
     if (normalizedLabel.includes('reported') || normalizedLabel.includes('open')) {
       return { dot: 'bg-red-500', text: 'text-red-600', line: 'bg-red-300' };
     }
@@ -96,6 +101,24 @@ const PostBase = ({
   const StatusBadge = () => {
     if (!currentStatus && !statusSlot) return null;
 
+    // Check if currentStatus is a React Element (like <BadgeBetter1 />)
+    if (isValidElement(currentStatus)) {
+        return (
+            <div 
+                className="relative"
+                onMouseEnter={() => setShowStatusTooltip(true)}
+                onMouseLeave={() => setShowStatusTooltip(false)}
+            >
+                {currentStatus}
+                {/* Tooltip Logic reused below */}
+                {showStatusTooltip && statusTimeline && statusTimeline.length > 0 && (
+                    <TimelineTooltip />
+                )}
+            </div>
+        );
+    }
+
+    // Default string handling logic
     const currentColors = getStatusColor(currentStatus);
 
     return (
@@ -111,42 +134,46 @@ const PostBase = ({
           </span>
         )}
 
-        {/* Status Timeline Tooltip - Horizontal */}
         {showStatusTooltip && statusTimeline && statusTimeline.length > 0 && (
-          <div className="absolute right-0 top-full mt-2 z-50 p-4 bg-white rounded-xl shadow-xl border border-gray-200 animate-fadeIn">
-            <div className="text-xs font-semibold text-gray-700 mb-3">Status Timeline</div>
-            <div className="flex items-start">
-              {statusTimeline.map((item, index) => {
-                const colors = getStatusColor(item.label);
-                const isLast = index === statusTimeline.length - 1;
-                
-                return (
-                  <div key={index} className="flex items-start">
-                    {/* Dot and content */}
-                    <div className="flex flex-col items-center">
-                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${item.active ? colors.dot : 'bg-gray-300 border-2 border-gray-200'}`} />
-                      <div className="mt-2 text-center min-w-[70px]">
-                        <div className={`text-[10px] font-semibold whitespace-nowrap ${item.active ? colors.text : 'text-gray-400'}`}>
-                          {item.label}
-                        </div>
-                        {item.timestamp && (
-                          <div className="text-[9px] text-gray-400 mt-0.5 whitespace-nowrap">{item.timestamp}</div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Horizontal line */}
-                    {!isLast && (
-                      <div className={`h-0.5 w-6 mt-1.5 flex-shrink-0 ${item.active ? colors.line : 'bg-gray-200'}`} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+            <TimelineTooltip />
         )}
       </div>
     );
   };
+
+  // Extract Timeline Tooltip to reuse it easily
+  const TimelineTooltip = () => (
+    <div className="absolute right-0 top-full mt-2 z-50 p-4 bg-white rounded-xl shadow-xl border border-gray-200 animate-fadeIn min-w-[200px]">
+        <div className="text-xs font-semibold text-gray-700 mb-3">Status Timeline</div>
+        <div className="flex items-start overflow-x-auto pb-2 scrollbar-thin">
+            {statusTimeline.map((item, index) => {
+                const colors = getStatusColor(item.label);
+                const isLast = index === statusTimeline.length - 1;
+                
+                return (
+                    <div key={index} className="flex items-start">
+                        {/* Dot and content */}
+                        <div className="flex flex-col items-center">
+                            <div className={`w-3 h-3 rounded-full flex-shrink-0 ${item.active ? colors.dot : 'bg-gray-300 border-2 border-gray-200'}`} />
+                            <div className="mt-2 text-center min-w-[70px]">
+                                <div className={`text-[10px] font-semibold whitespace-nowrap ${item.active ? colors.text : 'text-gray-400'}`}>
+                                    {item.label}
+                                </div>
+                                {item.timestamp && (
+                                    <div className="text-[9px] text-gray-400 mt-0.5 whitespace-nowrap">{item.timestamp}</div>
+                                )}
+                            </div>
+                        </div>
+                        {/* Horizontal line */}
+                        {!isLast && (
+                            <div className={`h-0.5 w-6 mt-1.5 flex-shrink-0 ${item.active ? colors.line : 'bg-gray-200'}`} />
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+  );
 
   const ActionButton = ({ icon, count, active, onClick, label }) => (
     <button
