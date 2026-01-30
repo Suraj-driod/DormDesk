@@ -226,6 +226,9 @@ This project is private and proprietary. All rights reserved.
 ## 👥 Authors
 
 - Project Team
+1. Suraj Pednekar(Team Leader)
+2. Sarvesh Saste
+3. Omkar Shendge
 
 ---
 
