@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { TextInput, ImageUpload } from '../../components/core';
-import { Button } from '../../page/Glow.jsx'; 
+import { Button } from '../../UI/Glow.jsx'; 
 import { theme } from '../../theme';
 import { motion } from "framer-motion"; 
 import { UserPlus } from "lucide-react"; 
-import { SelectBetter } from '../../page/SelectBetter.jsx'; 
+import { SelectBetter } from '../../UI/SelectBetter.jsx'; 
 
 const ROLE_OPTIONS = [
   { value: 'student', label: 'Student' },

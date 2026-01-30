@@ -1,9 +1,11 @@
 import { useForm } from 'react-hook-form';
 import { useRef, useState, useEffect } from 'react';
 import { theme } from '../../theme';
-import { Button } from '../../page/Glow'; 
-import { SelectBetter } from '../../page/SelectBetter'; 
+import { Button } from '../../UI/Glow'; 
+import { SelectBetter } from '../../UI/SelectBetter'; 
+import { useAuth } from '../../auth/AuthContext'; 
 
+// Options as requested
 const COMPLAINT_TYPES = [
   { value: 'caretaker', label: 'Caretaker' },
   { value: 'admin', label: 'Admin' },
@@ -11,6 +13,7 @@ const COMPLAINT_TYPES = [
 ];
 
 const Complaint = () => {
+  const { user, supabase } = useAuth(); 
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -21,7 +24,8 @@ const Complaint = () => {
     handleSubmit,
     setValue,
     watch,
-    trigger, // Added trigger for immediate validation on custom select
+    trigger, 
+    reset,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
@@ -33,20 +37,70 @@ const Complaint = () => {
     },
   });
 
-  // Watch the select value for the custom component
   const watchedComplaintType = watch('complaintType');
 
-  // Register custom select field
   useEffect(() => {
     register('complaintType', { required: 'Please select a complaint type' });
   }, [register]);
 
-  const onSubmit = (data) => {
-    console.log('Complaint submitted:', data);
-    alert('Complaint submitted successfully!');
+  const onSubmit = async (data) => {
+    if (!user) {
+      alert("Please login to submit a complaint.");
+      return;
+    }
+
+    try {
+      // 1. Upload Media (Optional)
+      let mediaUrl = null;
+      if (data.media) {
+        const file = data.media;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const filePath = `complaints/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('complaint-media') 
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('complaint-media')
+          .getPublicUrl(filePath);
+          
+        mediaUrl = publicUrlData.publicUrl;
+      }
+
+      // 2. Insert into 'complaints' table
+      const { error: insertError } = await supabase
+        .from('complaints')
+        .insert([
+          {
+            complaint_type: data.complaintType,
+            description: data.description,
+            accused_user: data.accusedName,
+            raised_by: user.id,
+            
+            // ✅ FIX: Using the exact Enum value from your list
+            status: 'submitted', 
+            
+            // media_url: mediaUrl // Uncomment if you add this column
+          }
+        ]);
+
+      if (insertError) throw insertError;
+
+      alert('Complaint submitted successfully!');
+      reset();
+      setMediaPreview(null);
+      setMediaType(null);
+
+    } catch (error) {
+      console.error('Error submitting complaint:', error);
+      alert('Failed to submit: ' + error.message);
+    }
   };
 
-  // Handler for SelectBetter
   const handleSelectChange = (name, value) => {
     setValue(name, value);
     trigger(name);
@@ -59,24 +113,19 @@ const Complaint = () => {
 
   const processFile = (file) => {
     if (!file) return;
-
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024; 
     if (file.size > maxSize) {
       alert('File size must be less than 50MB');
       return;
     }
-
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
-
     if (!isVideo && !isImage) {
       alert('Please upload an image or video file');
       return;
     }
-
     setMediaType(isVideo ? 'video' : 'image');
     setValue('media', file);
-
     const reader = new FileReader();
     reader.onload = (ev) => setMediaPreview(ev.target.result);
     reader.readAsDataURL(file);
@@ -107,7 +156,6 @@ const Complaint = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Updated to rounded-full for pill shape
   const inputStyles = `
     w-full px-4 py-3.5 rounded-full text-base
     bg-gray-50 border-2 border-transparent
@@ -120,13 +168,11 @@ const Complaint = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FEFF] to-white py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">File a Complaint</h1>
           <p className="text-gray-500">Submit a complaint with relevant details and optional proof</p>
         </div>
 
-        {/* Form Card */}
         <form
           onSubmit={handleSubmit(onSubmit)}
           className={`${theme.glass} rounded-2xl p-6 md:p-8 ${theme.glow}`}
@@ -148,10 +194,8 @@ const Complaint = () => {
             {errors.title && <span className="text-xs text-red-500 mt-1 ml-1">{errors.title.message}</span>}
           </div>
 
-          {/* Complaint Type + Accused Name */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-            
-            {/* Complaint Type (SelectBetter) */}
+            {/* Complaint Type */}
             <div>
               <SelectBetter
                 label="Complaint Type"
@@ -197,7 +241,6 @@ const Complaint = () => {
               })}
               placeholder="Describe the complaint in detail..."
               rows={4}
-              // Override rounded-full with rounded-2xl for textareas
               className={`${inputStyles} !rounded-2xl min-h-[120px] resize-y ${
                 errors.description ? 'border-red-500' : ''
               }`}
@@ -207,7 +250,7 @@ const Complaint = () => {
             )}
           </div>
 
-          {/* Media Proof (Optional) */}
+          {/* Media Proof */}
           <div className="mb-5">
             <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Media Proof (Optional)
@@ -290,7 +333,6 @@ const Complaint = () => {
             </div>
           </div>
 
-          {/* Incident Date & Time (Optional) */}
           <div className="mb-6">
             <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Incident Date & Time (Optional)
@@ -304,7 +346,6 @@ const Complaint = () => {
             <span className="text-xs text-gray-400 mt-1 block ml-1">Auto-filled based on current time</span>
           </div>
 
-          {/* Submit Button */}
           <Button type="submit" fullWidth disabled={isSubmitting}>
             {isSubmitting ? (
               <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">

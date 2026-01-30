@@ -9,9 +9,15 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Profile from './pages/Profile/Profile';    
 import Issues from './pages/Issues/Issues';
 import Feed from './pages/Feed/Feed';
+import IssuesAdmin from './management/admin/IssuesAdmin';
+import AdminAnnouncement from './management/admin/AdminAnnouncement';
+import AdminLost from './management/admin/AdminLost';
+import AdminCases from './management/admin/AdminCases';
+import Responses from './management/admin/Responses';
+import Assignment from './management/caretaker/Assignment';
 
 function App() {
-  const [page, setPage] = useState('dashboard'); // Changed default to show PostDemo
+  const [page, setPage] = useState('assignment'); 
 
   if (page === 'login') {
     return <Login onNavigateToRegister={() => setPage('register')} />;
@@ -52,7 +58,31 @@ function App() {
   if (page === 'feed') {
     return <Feed />;
   }
+ //ADMIN PAGES FROM HERE
+
+  if(page === 'issuesadmin') {
+    return <IssuesAdmin />;
+  } 
   
+  if(page === 'adminannouncement') {
+    return <AdminAnnouncement />;
+  } 
+
+  if(page === 'adminlost') {
+    return <AdminLost />;
+  } 
+
+  if(page === 'admincases') {
+    return <AdminCases />;
+  } 
+
+  if(page === 'responses') {    
+    return <Responses />;
+  }
+
+  if (page === 'assignment') {
+    return <Assignment />;
+  } 
 
   return <Register onNavigateToLogin={() => setPage('login')} />;
 }

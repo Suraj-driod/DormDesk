@@ -1,32 +1,36 @@
 import { useForm } from 'react-hook-form';
 import { useState, useRef, useEffect } from 'react';
 import { theme } from '../../theme';
-import { SelectBetter } from '../../page/SelectBetter';
-import { Button } from '../../page/Glow'; // Importing your custom Button component
+import { SelectBetter } from '../../UI/SelectBetter';
+import { Button } from '../../UI/Glow'; 
+import { useAuth } from '../../auth/AuthContext'; 
 
+// 1. Categories (Matches issue_category Enum)
 const CATEGORIES = [
-  { value: 'water', label: 'Water' },
-  { value: 'electricity', label: 'Electricity' },
-  { value: 'internet', label: 'Internet' },
-  { value: 'cleaning', label: 'Cleaning' },
+  { value: 'plumbing', label: 'Water' },
+  { value: 'electrical', label: 'Electricity' },
+  { value: 'wifi', label: 'Internet' },
+  { value: 'cleanliness', label: 'Cleaning' },
   { value: 'furniture', label: 'Furniture' },
-   { value: 'food', label: 'Food' },
+  { value: 'mess food', label: 'Food' },
   { value: 'other', label: 'Other' }
-  
 ];
 
+// 2. Urgency (Matches issue_priority Enum: 'Low', 'Medium', 'High')
 const URGENCY_LEVELS = [
   { value: 'low', label: 'Low', color: 'bg-green-500' },
   { value: 'medium', label: 'Medium', color: 'bg-yellow-500' },
   { value: 'high', label: 'High', color: 'bg-red-500' },
 ];
 
+// 3. Visibility (Matches issue_visibility_type Enum: 'Public', 'Private')
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Public' },
   { value: 'private', label: 'Private (visible only to Admin)' },
 ];
 
 const ReportIssue = () => {
+  const { user, supabase } = useAuth(); 
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -38,10 +42,11 @@ const ReportIssue = () => {
     setValue,
     watch,
     trigger,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
-      urgency: 'medium',
+      urgency: 'Medium', // ✅ Default must match Enum case (Capitalized)
       category: '',
       visibility: '',
       dateTime: new Date().toLocaleString('en-IN', {
@@ -69,9 +74,68 @@ const ReportIssue = () => {
     Boolean(watchedVisibility) &&
     Boolean(selectedUrgency);
 
-  const onSubmit = (data) => {
-    console.log('Form submitted:', data);
-    alert('Issue submitted successfully!');
+  // --- SUBMISSION HANDLER ---
+  const onSubmit = async (data) => {
+    if (!user) {
+      alert("You must be logged in to submit an issue.");
+      return;
+    }
+
+    try {
+      // 1. Upload Media (if exists)
+      let mediaUrl = null;
+      if (data.media) {
+        const file = data.media;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const filePath = `issues/${fileName}`; 
+
+        const { error: uploadError } = await supabase.storage
+          .from('issue-media') 
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+        
+        const { data: publicUrlData } = supabase.storage
+          .from('issue-media')
+          .getPublicUrl(filePath);
+          
+        mediaUrl = publicUrlData.publicUrl;
+      }
+
+      // 2. Insert Record into 'issues' table
+      const { error: insertError } = await supabase
+        .from('issues')
+        .insert([
+          {
+            title: data.title,
+            description: data.description,
+            
+            // Enum Mapping
+            category: data.category, 
+            priority: data.urgency,      // Sending 'Medium' (Matches issue_priority)
+            status: 'Reported',          // Sending 'Reported' (Matches issue_status)
+            visibility: data.visibility, // Sending 'Public' (Matches issue_visibility_type)
+            
+            created_by: user.id,
+            hostel: data.hostelName,
+            block: data.block,
+            room_no: data.roomNumber || null,
+            media_url: mediaUrl, 
+          }
+        ]);
+
+      if (insertError) throw insertError;
+
+      alert('Issue submitted successfully!');
+      reset(); 
+      setMediaPreview(null);
+      setMediaType(null);
+
+    } catch (error) {
+      console.error('Error submitting issue:', error);
+      alert('Failed to submit issue: ' + error.message);
+    }
   };
 
   const handleSelectChange = (name, value) => {
@@ -87,7 +151,7 @@ const ReportIssue = () => {
   const processFile = (file) => {
     if (!file) return;
 
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024; 
     if (file.size > maxSize) {
       alert('File size must be less than 50MB');
       return;
@@ -146,18 +210,15 @@ const ReportIssue = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FEFF] to-white py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Report an Issue</h1>
           <p className="text-gray-500">Help us maintain your hostel by reporting any issues</p>
         </div>
 
-        {/* Form Card */}
         <form
           onSubmit={handleSubmit(onSubmit)}
           className={`${theme.glass} rounded-2xl p-6 md:p-8 ${theme.glow}`}
         >
-          {/* Issue Title */}
           <div className="mb-5">
             <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Issue Title<span className="text-red-500 ml-0.5">*</span>
@@ -173,11 +234,8 @@ const ReportIssue = () => {
             )}
           </div>
 
-          {/* Category / Visibility + Urgency */}
           <div className="mb-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              
-              {/* Issue Category */}
               <div>
                 <SelectBetter
                   label="Issue Category"
@@ -190,8 +248,6 @@ const ReportIssue = () => {
                   required
                 />
               </div>
-
-              {/* Visibility */}
               <div>
                 <SelectBetter
                   label="Visibility"
@@ -206,7 +262,6 @@ const ReportIssue = () => {
               </div>
             </div>
 
-            {/* Urgency */}
             <div className="mt-5">
               <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                 Urgency Level<span className="text-red-500 ml-0.5">*</span>
@@ -239,7 +294,6 @@ const ReportIssue = () => {
             </div>
           </div>
 
-          {/* Description */}
           <div className="mb-5">
             <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
               Description<span className="text-red-500 ml-0.5">*</span>
@@ -262,7 +316,6 @@ const ReportIssue = () => {
 
           {isInitialSectionComplete && (
             <>
-              {/* Location Section */}
               <div className="mb-5">
                 <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2 ml-1">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -272,7 +325,6 @@ const ReportIssue = () => {
                   Location Details
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Hostel Name */}
                   <div>
                     <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                       Hostel Name<span className="text-red-500 ml-0.5">*</span>
@@ -287,8 +339,6 @@ const ReportIssue = () => {
                       <span className="text-xs text-red-500 mt-1 ml-1">{errors.hostelName.message}</span>
                     )}
                   </div>
-
-                  {/* Block */}
                   <div>
                     <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                       Block Name / Number<span className="text-red-500 ml-0.5">*</span>
@@ -303,8 +353,6 @@ const ReportIssue = () => {
                       <span className="text-xs text-red-500 mt-1 ml-1">{errors.block.message}</span>
                     )}
                   </div>
-
-                  {/* Floor */}
                   <div>
                     <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                       Floor Number<span className="text-red-500 ml-0.5">*</span>
@@ -319,8 +367,6 @@ const ReportIssue = () => {
                       <span className="text-xs text-red-500 mt-1 ml-1">{errors.floor.message}</span>
                     )}
                   </div>
-
-                  {/* Room */}
                   <div>
                     <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                       Room Number
@@ -335,7 +381,6 @@ const ReportIssue = () => {
                 </div>
               </div>
 
-              {/* Media Upload */}
               <div className="mb-5">
                 <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                   Photo / Video Proof
@@ -415,7 +460,6 @@ const ReportIssue = () => {
                 </div>
               </div>
 
-              {/* Date & Time */}
               <div className="mb-6">
                 <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
                   Date & Time
@@ -429,7 +473,6 @@ const ReportIssue = () => {
                 <span className="text-xs text-gray-400 mt-1 block ml-1">Auto-filled based on current time</span>
               </div>
 
-              {/* Submit Button - Uses your custom Button component */}
               <Button type="submit" fullWidth disabled={isSubmitting}>
                 {isSubmitting ? (
                   <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
