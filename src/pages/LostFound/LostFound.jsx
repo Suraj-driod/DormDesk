@@ -1,15 +1,18 @@
 import { useForm } from 'react-hook-form';
 import { useRef, useState, useEffect } from 'react';
 import { theme } from '../../theme';
-import { Button } from '../../page/Glow'; 
-import { SelectBetter } from '../../page/SelectBetter'; 
+import { Button } from '../../UI/Glow'; 
+import { SelectBetter } from '../../UI/SelectBetter'; 
+import { useAuth } from '../../auth/AuthContext'; // Import Auth Context
 
+// Enum values match your DB: {lost, found, claimed}
 const STATUS_OPTIONS = [
   { value: 'lost', label: 'Lost' },
   { value: 'found', label: 'Found' },
 ];
 
 const LostFound = () => {
+  const { user, supabase } = useAuth(); // Auth Hook
   const [imagePreview, setImagePreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -19,7 +22,8 @@ const LostFound = () => {
     handleSubmit,
     setValue,
     watch,
-    trigger, // Added trigger for manual validation of custom select
+    trigger, 
+    reset,
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
@@ -29,17 +33,68 @@ const LostFound = () => {
 
   const watchedStatus = watch('status');
 
-  // Register the custom select field
   useEffect(() => {
     register('status', { required: 'Please select a status' });
   }, [register]);
 
-  const onSubmit = (data) => {
-    console.log('Lost & Found submitted:', data);
-    alert('Lost & Found submitted successfully!');
+  // --- SUBMIT HANDLER ---
+  const onSubmit = async (data) => {
+    if (!user) {
+      alert("Please login to report an item.");
+      return;
+    }
+
+    try {
+      // 1. Upload Image (Optional)
+      let imageUrl = null;
+      if (data.image) {
+        const file = data.image;
+        const fileExt = file.name.split('.').pop();
+        // Path: userId/timestamp.ext
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const filePath = `lost-items/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('lost-items-media') // Ensure this bucket exists in Supabase
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('lost-items-media')
+          .getPublicUrl(filePath);
+          
+        imageUrl = publicUrlData.publicUrl;
+      }
+
+      // 2. Insert into 'lost_items' table
+      const { error: insertError } = await supabase
+        .from('lost_items')
+        .insert([
+          {
+            title: data.title,
+            description: data.description,
+            location: data.location,
+            status: data.status,    // 'lost' or 'found' (Matches Enum)
+            reported_by: user.id,   // UUID
+            image_url: imageUrl,    // Text URL
+            
+            // claimed_by and claimed_at are null by default on creation
+          }
+        ]);
+
+      if (insertError) throw insertError;
+
+      alert('Item reported successfully!');
+      reset();
+      setImagePreview(null);
+
+    } catch (error) {
+      console.error('Error submitting lost & found:', error);
+      alert('Failed to submit: ' + error.message);
+    }
   };
 
-  // Handler for SelectBetter
   const handleSelectChange = (name, value) => {
     setValue(name, value);
     trigger(name);
@@ -96,7 +151,6 @@ const LostFound = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Changed rounded-xl to rounded-full for inputs
   const inputStyles = `
     w-full px-4 py-3.5 rounded-full text-base
     bg-gray-50 border-2 border-transparent
@@ -170,7 +224,6 @@ const LostFound = () => {
               {...register('description')}
               placeholder="Add any details that can help identify the item..."
               rows={4}
-              // Override with rounded-2xl for textareas
               className={`${inputStyles} !rounded-2xl min-h-[120px] resize-y`}
             />
           </div>
@@ -249,7 +302,6 @@ const LostFound = () => {
             </div>
           </div>
 
-          {/* Submit Button */}
           <Button type="submit" fullWidth disabled={isSubmitting}>
             {isSubmitting ? (
               <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">

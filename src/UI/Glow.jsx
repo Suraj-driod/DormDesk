@@ -99,11 +99,20 @@ export const Loader = () => (
 export const Toast = ({ text }) => (
   <div
     className={`
-      px-4 py-3 text-center w-1/4 rounded-xl
+      /* Broadness & Sizing */
+      min-w-[300px] max-w-md 
+      px-8 py-3 
+      text-center rounded-xl
+      
+      /* Colors & Glassmorphism */
       text-[#064E3B]
-      bg-[#4ADE80]/85 backdrop-blur
-      border border-[#22C55E]
-      shadow-[0_0_25px_rgba(52,211,153,0.7)]
+      bg-[#4ADE80]/85 backdrop-blur-md
+      border border-[#22C55E]/50
+      
+      /* Effects */
+      font-medium text-[15px]
+      shadow-[0_8px_32px_rgba(34,197,94,0.3)]
+      transition-all duration-300
     `}
   >
     {text}
@@ -238,34 +247,38 @@ export const EmptyState = ({ title, desc }) => (
 
 
 /* ================= 404 PAGE ================= */
-
 export const NotFound = () => (
-  <div className="min-h-screen flex items-center justify-center text-[#1f2937] bg-[#f8fafc]">
+  <div className="min-h-screen flex items-center justify-center text-[#1f2937] bg-[#f8fafc] px-4">
     <div
       className="
-        p-10 rounded-2xl text-center 
-        bg-white
-        border border-[#e5e7eb]
-        shadow-sm
+        w-full max-w-2xl
+        p-14
+        rounded-3xl 
+        text-center 
+        bg-white 
+        border border-[#e5e7eb] 
+        shadow-md
       "
     >
-      <h1 className="text-6xl font-bold text-[#374151]">404</h1>
+      <h1 className="text-8xl font-bold text-[#374151]">404</h1>
 
-      <p className="mt-2 text-[#6b7280]">
+      <p className="mt-4 text-lg text-[#6b7280]">
         Page Not Found
       </p>
 
-      <div className="flex items-center justify-center mt-5">
+      <div className="flex items-center justify-center mt-8">
         <button
           className="
-            px-6 py-2 rounded-full
+            px-10 py-3 
+            rounded-full
             bg-[#EF4444]
             text-white
-            font-medium
+            text-base
+            font-semibold
             cursor-pointer
-            shadow-[0_0_12px_rgba(239,68,68,0.45)]
+            shadow-[0_0_18px_rgba(239,68,68,0.45)]
             hover:bg-[#DC2626]
-            hover:shadow-[0_0_18px_rgba(239,68,68,0.6)]
+            hover:shadow-[0_0_24px_rgba(239,68,68,0.6)]
             transition-all
           "
         >
@@ -274,5 +287,4 @@ export const NotFound = () => (
       </div>
     </div>
   </div>
-)
-
+);

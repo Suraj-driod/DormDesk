@@ -11,7 +11,7 @@ import Issues from './pages/Issues/Issues';
 import Feed from './pages/Feed/Feed';
 
 function App() {
-  const [page, setPage] = useState('dashboard'); // Changed default to show PostDemo
+  const [page, setPage] = useState('feed'); // Changed default to show PostDemo
 
   if (page === 'login') {
     return <Login onNavigateToRegister={() => setPage('register')} />;

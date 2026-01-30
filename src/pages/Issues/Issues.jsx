@@ -1,58 +1,12 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Lock, Globe, FileText } from "lucide-react"; // Removed 'Filter' icon as SelectBetter handles it
+import { Search, Lock, Globe, FileText, Loader2 } from "lucide-react"; 
 import PostBase from "../../components/core/PostBase";
-import { BadgeBetter1 } from "../../page/BadgeBetter";
-import { SelectBetter } from "../../page/SelectBetter"; 
+import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { SelectBetter } from "../../UI/SelectBetter"; 
 
-// --- Mock Data ---
-const MOCK_ISSUES = [
-  {
-    id: 1,
-    type: "public",
-    title: "Water Cooler Leaking on 2nd Floor",
-    author: "Rahul V.",
-    timestamp: new Date("2026-01-28T10:30:00"),
-    content: "The water cooler near the stairs is leaking continuously. It's creating a slipping hazard.",
-    status: "Reported",
-    upvotes: 15,
-    comments: 4,
-    media: { type: "image", url: "https://images.unsplash.com/photo-1585314062340-f1a5a7c9328d?q=80&w=600&auto=format&fit=crop" }
-  },
-  {
-    id: 2,
-    type: "private",
-    title: "Room 304 - Fan Making Noise",
-    author: "You",
-    timestamp: new Date("2026-01-27T14:20:00"),
-    content: "The ceiling fan in my room is making a loud grinding noise. Cannot sleep properly.",
-    status: "InProgress",
-    upvotes: 0,
-    comments: 2,
-  },
-  {
-    id: 3,
-    type: "public",
-    title: "Mess Food Quality Drop",
-    author: "Anjali S.",
-    timestamp: new Date("2026-01-26T09:00:00"),
-    content: "The dinner served yesterday was cold and undercooked. Requesting a quality check.",
-    status: "Resolved",
-    upvotes: 42,
-    comments: 12,
-  },
-  {
-    id: 4,
-    type: "private",
-    title: "Lost ID Card Request",
-    author: "You",
-    timestamp: new Date("2026-01-25T11:00:00"),
-    content: "I lost my ID card yesterday. Need a replacement urgently.",
-    status: "Assigned",
-    upvotes: 0,
-    comments: 1,
-  },
-];
+// --- Import the Backend Hook ---
+import { useMyReports } from "../../services/MyReports";
 
 // --- Options for SelectBetter ---
 const FILTER_OPTIONS = [
@@ -64,19 +18,28 @@ const FILTER_OPTIONS = [
 ];
 
 const Issues = () => {
+  // 1. Fetch Real Data
+  const { reports, loading } = useMyReports();
+  
   const [activeTab, setActiveTab] = useState("public"); // 'public' | 'private'
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  // Filter Logic
+  // 2. Filter Logic (Applied to Real Data)
   const filteredIssues = useMemo(() => {
-    return MOCK_ISSUES.filter((issue) => {
-      const matchesTab = issue.type === activeTab;
+    return reports.filter((issue) => {
+      // Ensure safe comparison by converting to lower case
+      const issueType = issue.type ? issue.type.toLowerCase() : 'public';
+      
+      const matchesTab = issueType === activeTab;
       const matchesSearch = issue.title.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      // Status matching (Handle case sensitivity if needed)
       const matchesStatus = statusFilter === "All" || issue.status === statusFilter;
+      
       return matchesTab && matchesSearch && matchesStatus;
     });
-  }, [activeTab, searchQuery, statusFilter]);
+  }, [activeTab, searchQuery, statusFilter, reports]);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(#f7fdff,#ffffff)] font-['Poppins',sans-serif] p-4 md:p-8">
@@ -136,59 +99,67 @@ const Issues = () => {
                <SelectBetter 
                  options={FILTER_OPTIONS}
                  value={statusFilter}
-                 onChange={setStatusFilter}
+                 onChange={(e) => setStatusFilter(e.target.value)}
+                 placeholder="Status"
                />
             </div>
           </div>
         </div>
 
         {/* --- List Section --- */}
-        <motion.div layout className="grid grid-cols-1 gap-6 z-0 relative">
-          <AnimatePresence mode="popLayout">
-            {filteredIssues.length > 0 ? (
-              filteredIssues.map((issue) => (
+        {loading ? (
+           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+             <Loader2 className="animate-spin mb-2" size={32} />
+             <p>Loading your reports...</p>
+           </div>
+        ) : (
+          <motion.div layout className="grid grid-cols-1 gap-6 z-0 relative">
+            <AnimatePresence mode="popLayout">
+              {filteredIssues.length > 0 ? (
+                filteredIssues.map((issue) => (
+                  <motion.div
+                    key={issue.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <PostBase
+                      title={issue.title}
+                      author={issue.author}
+                      timestamp={issue.timestamp}
+                      content={issue.content}
+                      visibility={issue.type} // 'public' or 'private'
+                      media={issue.media}
+                      upvoteCount={issue.upvotes}
+                      commentCount={issue.comments}
+                      currentStatus={<BadgeBetter1 status={issue.status} />}
+                      // Simple timeline logic based on status
+                      statusTimeline={[
+                        { label: "Reported", timestamp: "Created", active: true },
+                        { label: issue.status, timestamp: "Current", active: true },
+                      ]}
+                    />
+                  </motion.div>
+                ))
+              ) : (
                 <motion.div
-                  key={issue.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex flex-col items-center justify-center py-20 text-center"
                 >
-                  <PostBase
-                    title={issue.title}
-                    author={issue.author}
-                    timestamp={issue.timestamp}
-                    content={issue.content}
-                    visibility={issue.type}
-                    media={issue.media}
-                    upvoteCount={issue.upvotes}
-                    commentCount={issue.comments}
-                    // Injecting the BadgeBetter1 Component directly
-                    currentStatus={<BadgeBetter1 status={issue.status} />}
-                    
-                    // Specific status timeline if needed (mocked here)
-                    statusTimeline={[
-                      { label: "Reported", timestamp: "Jan 28", active: true },
-                      { label: issue.status, timestamp: "Today", active: true },
-                    ]}
-                  />
+                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                    <FileText className="text-gray-400" size={32} />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-800">No Issues Found</h3>
+                  <p className="text-gray-500 text-sm mt-1">
+                    You have no {activeTab} reports matching your filters.
+                  </p>
                 </motion.div>
-              ))
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-20 text-center"
-              >
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                  <FileText className="text-gray-400" size={32} />
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800">No Issues Found</h3>
-                <p className="text-gray-500 text-sm mt-1">Try adjusting your search or filters.</p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
 
       </div>
     </div>

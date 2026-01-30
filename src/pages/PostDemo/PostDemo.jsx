@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import PostBase from '../../components/core/PostBase';
 import PostDetailBase from '../../components/core/PostDetailBase';
-import { BadgeBetter1 } from '../../page/BadgeBetter';
+import { BadgeBetter1 } from '../../UI/BadgeBetter';
 import { isValidElement } from 'react';
 
 const PostDemo = () => {

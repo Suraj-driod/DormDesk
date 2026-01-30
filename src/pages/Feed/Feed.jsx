@@ -2,81 +2,16 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Megaphone, Users, Search, AlertTriangle, 
-  Plus, Filter, FileText 
+  Plus, FileText, Loader2 
 } from "lucide-react";
 
 // --- Custom Components ---
 import PostBase from "../../components/core/PostBase";
-import { SelectBetter } from "../../page/SelectBetter";
-import { BadgeBetter1 } from "../../page/BadgeBetter";
+import { SelectBetter } from "../../UI/SelectBetter";
+import { BadgeBetter1 } from "../../UI/BadgeBetter";
 
-// --- Mock Data ---
-const MOCK_DATA = {
-  issues: [
-    {
-      id: 1,
-      title: "Broken Streetlight near C-Block",
-      author: "Rahul V.",
-      timestamp: new Date("2026-01-28T19:30:00"),
-      content: "The streetlight creates a dark spot near the entrance. It's unsafe at night.",
-      status: "Reported",
-      upvotes: 12,
-      comments: 3,
-      visibility: "public"
-    },
-    {
-      id: 2,
-      title: "Gym Equipment Rusted",
-      author: "Alex M.",
-      timestamp: new Date("2026-01-27T10:00:00"),
-      content: "The treadmill in the boys' hostel gym is stuck and rusted.",
-      status: "InProgress",
-      upvotes: 45,
-      comments: 8,
-      visibility: "public"
-    }
-  ],
-  announcements: [
-    {
-      id: 3,
-      title: "Annual Sports Day Registration",
-      author: "Sports Committee",
-      timestamp: new Date("2026-01-29T09:00:00"),
-      content: "Registrations for Cricket, Football, and Basketball are now open. Visit the gym office to sign up.",
-      status: "Assigned", 
-      upvotes: 89,
-      comments: 12,
-      visibility: "public"
-    }
-  ],
-  lost: [
-    {
-      id: 5,
-      title: "Lost: Black Sony Headphones",
-      author: "Priya S.",
-      timestamp: new Date("2026-01-28T16:20:00"),
-      content: "Left them in the library reading room table 4. Please contact if found.",
-      status: "Reported",
-      upvotes: 5,
-      comments: 1,
-      visibility: "public",
-      media: { type: 'image', url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=600&auto=format&fit=crop' }
-    }
-  ],
-  complaints: [
-    {
-      id: 6,
-      title: "Loud Music in B-Block Post Midnight",
-      author: "Anonymous",
-      timestamp: new Date("2026-01-28T01:30:00"),
-      content: "Residents of Room 304 are playing loud music every night. It's disturbing everyone.",
-      status: "Assigned",
-      upvotes: 20,
-      comments: 0,
-      visibility: "public"
-    }
-  ]
-};
+// --- Backend Hook ---
+import { useFeedGet } from "../../services/FeedGet"; // Import the hook
 
 const SORT_OPTIONS = [
   { value: 'newest', label: 'Newest First' },
@@ -95,10 +30,8 @@ const Feed = () => {
   const [activeTab, setActiveTab] = useState('issues');
   const [sortOrder, setSortOrder] = useState('newest');
 
-  // --- Helpers ---
-  const currentData = useMemo(() => {
-    return MOCK_DATA[activeTab] || [];
-  }, [activeTab]);
+  // --- Fetch Real Data ---
+  const { data: currentData, loading } = useFeedGet(activeTab);
 
   const getActionConfig = () => {
     switch (activeTab) {
@@ -110,6 +43,17 @@ const Feed = () => {
   };
 
   const actionConfig = getActionConfig();
+
+  // --- Sorting Logic (Client Side for now) ---
+  const sortedData = useMemo(() => {
+    if (!currentData) return [];
+    return [...currentData].sort((a, b) => {
+      if (sortOrder === 'newest') return b.timestamp - a.timestamp;
+      if (sortOrder === 'top') return b.upvotes - a.upvotes;
+      if (sortOrder === 'discussed') return b.comments - a.comments;
+      return 0;
+    });
+  }, [currentData, sortOrder]);
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-['Poppins',sans-serif]">
@@ -125,7 +69,7 @@ const Feed = () => {
               <p className="text-gray-500 text-xs md:text-sm mt-1">Stay updated with the latest happenings</p>
             </div>
 
-            {/* Desktop Action Button (Hidden on Mobile) */}
+            {/* Desktop Action Button */}
             {actionConfig && (
               <div className="hidden md:block">
                 <motion.button
@@ -147,7 +91,7 @@ const Feed = () => {
             )}
           </div>
 
-          {/* --- Tabs Navigation (Inside Sticky Header) --- */}
+          {/* --- Tabs Navigation --- */}
           <div className="mt-6 overflow-x-auto scrollbar-hide pb-1">
             <div className="flex gap-2 min-w-max">
               {TABS.map((tab) => (
@@ -181,7 +125,7 @@ const Feed = () => {
       {/* --- Main Content Area --- */}
       <div className="max-w-5xl mx-auto px-4 py-6">
         
-        {/* Sort Filter (Separate Row) */}
+        {/* Sort Filter */}
         <div className="flex justify-end mb-6">
           <div className="w-full md:w-56">
             <SelectBetter
@@ -196,8 +140,20 @@ const Feed = () => {
         {/* Feed List */}
         <motion.div layout className="space-y-6 pb-20">
           <AnimatePresence mode="wait">
-            {currentData.length > 0 ? (
-              currentData.map((post) => (
+            
+            {loading ? (
+               <motion.div 
+                 key="loader"
+                 initial={{ opacity: 0 }} 
+                 animate={{ opacity: 1 }}
+                 exit={{ opacity: 0 }}
+                 className="py-20 flex flex-col items-center text-gray-400"
+               >
+                 <Loader2 className="animate-spin mb-2" size={32} />
+                 <p>Loading {activeTab}...</p>
+               </motion.div>
+            ) : sortedData.length > 0 ? (
+              sortedData.map((post) => (
                 <motion.div
                   key={post.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -214,12 +170,12 @@ const Feed = () => {
                     media={post.media}
                     upvoteCount={post.upvotes}
                     commentCount={post.comments}
-                    // Inject Badge
+                    // Inject Badge based on Status Enum
                     currentStatus={<BadgeBetter1 status={post.status} />}
-                    // Example Timeline
+                    // Simple Timeline Mock for UI
                     statusTimeline={[
-                      { label: "Reported", timestamp: "Jan 28", active: true },
-                      { label: post.status, timestamp: "Today", active: true },
+                      { label: "Posted", timestamp: post.timestamp.toLocaleDateString(), active: true },
+                      { label: post.status, timestamp: "Current", active: true },
                     ]}
                   />
                 </motion.div>
@@ -239,6 +195,7 @@ const Feed = () => {
                 <p className="text-gray-500 text-sm mt-1">Check back later or be the first to post!</p>
               </motion.div>
             )}
+
           </AnimatePresence>
         </motion.div>
       </div>

@@ -1,16 +1,21 @@
 import { useState } from 'react';
 import { TextInput } from '../../components/core';
 import { theme } from '../../theme';
-import { Button } from '../../page/Glow.jsx';
+import { Button, Toast } from '../../UI/Glow.jsx';
 import { motion } from "framer-motion";
 import { LogIn } from "lucide-react";
+import { useAuth } from "../../auth/AuthContext";
 
 const Login = ({ onNavigateToRegister }) => {
+  const { login } = useAuth();
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
   });
+
   const [errors, setErrors] = useState({});
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -20,7 +25,7 @@ const Login = ({ onNavigateToRegister }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {};
 
@@ -32,11 +37,25 @@ const Login = ({ onNavigateToRegister }) => {
       return;
     }
 
-    console.log('Login submitted:', formData);
+    const { error } = await login(formData.email, formData.password);
+
+    if (error) {
+      setErrors({ general: error.message });
+      return;
+    }
+
+    setShowSuccess(true);
+
+    setTimeout(() => {
+      setShowSuccess(false);
+    }, 2000);
+
+    console.log("Login success");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[linear-gradient(#f7fdff,#ffffff)] font-['Poppins',sans-serif] text-[#0f172a] px-4">
+    // 1. Changed to 'flex-col' so items stack vertically
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[linear-gradient(#f7fdff,#ffffff)] font-['Poppins',sans-serif] text-[#0f172a] px-4">
       
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
@@ -77,6 +96,7 @@ const Login = ({ onNavigateToRegister }) => {
               required
               autoComplete="email"
             />
+
             <TextInput
               label="Password"
               name="password"
@@ -89,6 +109,12 @@ const Login = ({ onNavigateToRegister }) => {
               autoComplete="current-password"
             />
 
+            {errors.general && (
+              <p className="text-red-500 text-sm text-center">
+                {errors.general}
+              </p>
+            )}
+
             <div className="pt-2">
               <Button type="submit" fullWidth>
                 Sign In
@@ -97,7 +123,6 @@ const Login = ({ onNavigateToRegister }) => {
           </motion.div>
         </form>
 
-        {/* Footer Link */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -114,6 +139,15 @@ const Login = ({ onNavigateToRegister }) => {
           </button>
         </motion.p>
       </motion.div>
+
+      {/* 2. Moved Toast Here & Removed 'fixed' positioning */}
+      {/* We use 'mt-6' to give it space below the card */}
+      {showSuccess && (
+        <div className="mt-6 animate-in slide-in-from-top-2 duration-300 fade-in">
+          <Toast text="Login successful 🎉" />
+        </div>
+      )}
+
     </div>
   );
 };
