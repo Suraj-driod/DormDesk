@@ -1,5 +1,5 @@
 import React from 'react';
-import PostBase from '../PostBase';
+import PostBase from '../PostBase/PostBase';
 
 const complaintTypeStyles = {
   noise: 'bg-orange-100 text-orange-700 border-orange-200',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import PostBase from '../PostBase';
+import PostBase from '../PostBase/PostBase';
 
 const PostDetailBase = ({
   // Post props (passed to PostBase)

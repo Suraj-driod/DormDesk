@@ -1,5 +1,5 @@
 import React from 'react';
-import PostBase from '../PostBase';
+import PostBase from '../PostBase/PostBase';
 
 const LostFoundPost = ({
   title,

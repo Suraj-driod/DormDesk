@@ -1,92 +1,49 @@
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import {
   Register,
   Login,
   ReportIssue,
   Complaint,
   LostFound,
-  PostDemo,
   Dashboard,
   Profile,
   Issues,
   Feed,
-} from "./pages";
+} from './pages';
 import IssuesAdmin from './management/admin/IssuesAdmin';
 import AdminAnnouncement from './management/admin/AdminAnnouncement';
 import AdminLost from './management/admin/AdminLost';
 import AdminCases from './management/admin/AdminCases';
-import Responses from './management/admin/Responses';
-import Assignment from './management/caretaker/Assignment';
+import AppLayout from './layouts/AppLayout';
 
 function App() {
-  const [page, setPage] = useState('register'); 
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public routes - no layout */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-  if (page === 'login') {
-    return <Login onNavigateToRegister={() => setPage('register')} />;
-  }
+        {/* Protected routes - with AppLayout */}
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/feed" element={<Feed />} />
+          <Route path="/issues" element={<Issues />} />
+          <Route path="/report-issue" element={<ReportIssue />} />
+          <Route path="/announcements" element={<Feed />} />
+          <Route path="/lost-found" element={<LostFound />} />
+          <Route path="/complaints" element={<Complaint />} />
+          <Route path="/profile" element={<Profile />} />
 
-  if (page === 'register') {
-    return <Register onNavigateToLogin={() => setPage('login')} />;
-  }
-
-  if (page === 'report') {
-    return <ReportIssue />;
-  }
-
-  if (page === 'complaint') {
-    return <Complaint />;
-  }
-
-  if (page === 'lostfound') {
-    return <LostFound />;
-  }
-
-  if (page === 'postdemo') {
-    return <PostDemo />;
-  }
-  
-  if (page === 'dashboard') {
-    return <Dashboard />;
-  } 
-
-  if (page === 'profile') {
-    return <Profile  />;
-  }
-
-  if (page === 'issues') {
-    return <Issues />;
-  } 
-
-  if (page === 'feed') {
-    return <Feed />;
-  }
- //ADMIN PAGES FROM HERE
-
-  if(page === 'issuesadmin') {
-    return <IssuesAdmin />;
-  } 
-  
-  if(page === 'adminannouncement') {
-    return <AdminAnnouncement />;
-  } 
-
-  if(page === 'adminlost') {
-    return <AdminLost />;
-  } 
-
-  if(page === 'admincases') {
-    return <AdminCases />;
-  } 
-
-  if(page === 'responses') {    
-    return <Responses />;
-  }
-
-  if (page === 'assignment') {
-    return <Assignment />;
-  } 
-
-  return <Register onNavigateToLogin={() => setPage('login')} />;
+          {/* Admin routes */}
+          <Route path="/admin/issues" element={<IssuesAdmin />} />
+          <Route path="/admin/announcements" element={<AdminAnnouncement />} />
+          <Route path="/admin/lost" element={<AdminLost />} />
+          <Route path="/admin/cases" element={<AdminCases />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;

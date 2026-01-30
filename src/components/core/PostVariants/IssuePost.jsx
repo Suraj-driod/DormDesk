@@ -1,5 +1,5 @@
 import React from 'react';
-import PostBase from '../PostBase';
+import PostBase from '../PostBase/PostBase';
 
 const severityStyles = {
   critical: 'bg-red-100 text-red-700 border-red-200',

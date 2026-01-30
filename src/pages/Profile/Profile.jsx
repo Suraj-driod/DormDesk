@@ -6,9 +6,10 @@ import {
 } from "lucide-react";
 import { theme } from "../../theme";
 import { Button } from "../../UI/Glow";
-import { NotFound } from "../../UI/glow";                 // ✅ NotFound
-import { useAuth } from "../../auth/AuthContext";           // ✅ auth
-import { fetchUserProfile } from "../../services/FetchProfile"; // ✅ backend fetch
+import { NotFound } from "../../UI/Glow";
+import { useAuth } from "../../auth/AuthContext";
+// TODO: create FetchProfile service
+const fetchUserProfile = async () => null;
 
 const Profile = () => {
   const { user, supabase, logout } = useAuth();   // global auth

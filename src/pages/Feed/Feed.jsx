@@ -11,12 +11,13 @@ import {
 } from "lucide-react";
 
 // --- Custom Components ---
-import PostBase from "../../components/core/PostBase";
+import PostBase from "../../components/core/PostBase/PostBase";
 import { SelectBetter } from "../../UI/SelectBetter";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 
-// --- Backend Hook ---
-import { useFeedGet } from "../../services/FeedGet";
+// --- Backend Hook (TODO: create FeedGet service) ---
+// import { useFeedGet } from "../../Services/FeedGet";
+const useFeedGet = () => ({ data: [], loading: false });
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
