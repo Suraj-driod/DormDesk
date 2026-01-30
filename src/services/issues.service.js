@@ -60,3 +60,20 @@ export const deleteIssue = async (id) => {
   if (error) throw error;
   return data;
 };
+
+
+export const fetchIssuesForFeed = async () => {
+  const { data, error } = await supabase
+    .from("issues")
+    .select(`
+      id, title, description, created_at, status, visibility,
+      profile:created_by (name),
+      upvotes:issue_upvotes (count),
+      comments:issue_comments (count)
+    `)
+    .eq("visibility", "public")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data;
+};

@@ -1,7 +1,20 @@
-export { default as TextInput } from './TextInput';
-export { default as Select } from './Select';
-export { default as TextArea } from './TextArea';
-export { default as Button } from './Button';
-export { default as ImageUpload } from './ImageUpload';
-export { default as PostBase } from './PostBase';
-export { default as PostDetailBase } from './PostDetailBase';
+// Buttons
+export { default as Button } from "./Button/Button";
+
+// Uploads
+export { default as ImageUpload } from "./ImageUpload/ImageUpload";
+
+// Post Base
+export { default as PostBase } from "./PostBase/PostBase";
+export { default as PostDetailBase } from "./PostDetailBase/PostDetailBase";
+
+// Post Variants
+export { default as AnnouncementPost } from "./PostVariants/AnnouncementPost";
+export { default as ComplaintPost } from "./PostVariants/ComplaintPost";
+export { default as IssuePost } from "./PostVariants/IssuePost";
+export { default as LostFoundPost } from "./PostVariants/LostFoundPost";
+
+// Form / inputs
+export { default as Select } from "./Select/Select";
+export { default as TextArea } from "./TextArea/TextArea";
+export { default as TextInput } from "./TextInput/TextInput";

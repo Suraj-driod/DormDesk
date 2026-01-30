@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import PostBase from '../../components/core/PostBase';
-import PostDetailBase from '../../components/core/PostDetailBase';
+import { PostBase, PostDetailBase } from '../../components/core';
 import { BadgeBetter1 } from '../../UI/BadgeBetter';
 import { isValidElement } from 'react';
 

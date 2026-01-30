@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Lock, Globe, FileText, Loader2 } from "lucide-react"; 
-import PostBase from "../../components/core/PostBase";
+import { PostBase } from "../../components/core";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { SelectBetter } from "../../UI/SelectBetter"; 
 

@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import Register from './pages/Register';
-import Login from './pages/Login';
-import ReportIssue from './pages/ReportIssue';
-import Complaint from './pages/Complaint';
-import LostFound from './pages/LostFound';
-import PostDemo from './pages/PostDemo';
-import Dashboard from './pages/Dashboard/Dashboard';
-import Profile from './pages/Profile/Profile';    
-import Issues from './pages/Issues/Issues';
-import Feed from './pages/Feed/Feed';
+import {
+  Register,
+  Login,
+  ReportIssue,
+  Complaint,
+  LostFound,
+  PostDemo,
+  Dashboard,
+  Profile,
+  Issues,
+  Feed,
+} from "./pages";
 import IssuesAdmin from './management/admin/IssuesAdmin';
 import AdminAnnouncement from './management/admin/AdminAnnouncement';
 import AdminLost from './management/admin/AdminLost';
