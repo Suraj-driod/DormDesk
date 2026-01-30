@@ -1,59 +1,37 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { Footer } from "./Footer";
 
-/**
- * Props:
- * - children: React.ReactNode
- * - user: { name?: string, avatarUrl?: string } | null
- * - role: "admin" | "user"
- * - onLogout: () => void
- * - appName?: string
- * - showFooter?: boolean
- */
 export function LayoutWrapper({
   children,
   user,
   role,
   onLogout,
-  appName = "HostelIssue",
+  appName = "DormDesk",
   showFooter = true,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [activeKey, setActiveKey] = useState(undefined);
 
-  const sidebarWidthClass = useMemo(() => {
-    // Desktop only; navbar is fixed so main content uses padding-top.
-    return collapsed ? "md:pl-20" : "md:pl-64";
-  }, [collapsed]);
-
   return (
-    <div className="min-h-screen bg-[#F8F9FA]">
+    <div className="min-h-screen flex flex-col bg-[#F8F9FA]">
+      {/* Navbar */}
       <Navbar
         appName={appName}
         user={user}
         onLogout={onLogout}
         onMenuClick={() => setMobileOpen(true)}
-        collapsed={collapsed}
       />
 
-      <div className="pt-14">
-        {/* Sidebar (desktop fixed) */}
-        <div className="hidden md:block fixed top-14 left-0 bottom-0 z-40">
-          <Sidebar
-            role={role}
-            collapsed={collapsed}
-            onToggleCollapse={() => setCollapsed((v) => !v)}
-            activeKey={activeKey}
-            onNavigate={(key) => setActiveKey(key)}
-          />
-        </div>
-
-        {/* Sidebar (mobile drawer) */}
+      {/* Body */}
+      <div className="flex flex-1 pt-14 min-h-[calc(100vh-56px)]">
+        {/* Sidebar */}
         <Sidebar
           role={role}
+          collapsed={collapsed}
+          onToggleCollapse={() => setCollapsed((v) => !v)}
           mobileOpen={mobileOpen}
           onClose={() => setMobileOpen(false)}
           activeKey={activeKey}
@@ -63,13 +41,14 @@ export function LayoutWrapper({
           }}
         />
 
-        {/* Main */ }
-        <main className={["min-h-[calc(100vh-56px)]", sidebarWidthClass].join(" ")}>
-          <div className="mx-auto max-w-7xl px-4 py-6">{children}</div>
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="w-full px-6 py-6">
+            {children}
+          </div>
           {showFooter && <Footer appName={appName} />}
         </main>
       </div>
     </div>
   );
 }
-
