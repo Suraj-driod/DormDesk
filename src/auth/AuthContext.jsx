@@ -36,9 +36,21 @@ export const AuthProvider = ({ children }) => {
 
   /* ================= AUTH ACTIONS ================= */
 
-  // ✅ Login only
+  // ✅ Login
   const login = async (email, password) => {
     return await supabase.auth.signInWithPassword({ email, password });
+  };
+
+  // ✅ Sign Up (New)
+  const signUp = async (email, password, metadata) => {
+    return await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        // This stores fullName, phone, role, hostel details in 'raw_user_meta_data'
+        data: metadata, 
+      },
+    });
   };
 
   // 🚪 Logout
@@ -53,6 +65,7 @@ export const AuthProvider = ({ children }) => {
         session,
         loading,
         login,
+        signUp, // Exporting signUp
         logout,
         supabase,
       }}

@@ -17,7 +17,7 @@ import Responses from './management/admin/Responses';
 import Assignment from './management/caretaker/Assignment';
 
 function App() {
-  const [page, setPage] = useState('assignment'); 
+  const [page, setPage] = useState('register'); 
 
   if (page === 'login') {
     return <Login onNavigateToRegister={() => setPage('register')} />;
