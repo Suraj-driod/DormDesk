@@ -8,7 +8,7 @@ import {
 import { SelectBetter } from "../../UI/SelectBetter"; 
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { AlertModal } from "../../UI/Glow";
-import { fetchAssignedIssues, updateIssueStatus } from "../../Services/issues.service";
+import { fetchAssignedIssues, updateIssueStatus } from "../../services/issues.service";
 import { useAuth } from "../../auth/AuthContext";
 import { useAlert } from "../../hooks/useAlert";
 

@@ -5,8 +5,8 @@ import { SelectBetter } from '../../UI/SelectBetter';
 import { Button, AlertModal } from '../../UI/Glow'; 
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert'; 
-import { createIssue } from '../../Services/issues.service';
-import { uploadToImgBB } from '../../Services/imgbb.service';
+import { createIssue } from '../../services/issues.service';
+import { uploadToImgBB } from '../../services/imgbb.service';
 
 // 1. Categories (Matches issue_category Enum)
 const CATEGORIES = [

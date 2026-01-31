@@ -5,8 +5,8 @@ import { Button, AlertModal } from '../../UI/Glow';
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert';
-import { createLostItem } from '../../Services/lostItems.service';
-import { uploadToImgBB } from '../../Services/imgbb.service';
+import { createLostItem } from '../../services/lostItems.service';
+import { uploadToImgBB } from '../../services/imgbb.service';
 
 // Enum values match your DB: {lost, found, claimed}
 const STATUS_OPTIONS = [

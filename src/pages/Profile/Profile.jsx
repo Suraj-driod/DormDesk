@@ -7,7 +7,7 @@ import {
 import { theme } from "../../theme";
 import { Button, AlertModal } from "../../UI/Glow";
 import { useAuth } from "../../auth/AuthContext";
-import { fetchUserProfile, updateUserProfile } from "../../Services/profile.service";
+import { fetchUserProfile, updateUserProfile } from "../../services/profile.service";
 import { useAlert } from "../../hooks/useAlert";
 
 const ProfileField = ({ icon: Icon, label, value, editable, fieldKey, editValue, onEditChange }) => (

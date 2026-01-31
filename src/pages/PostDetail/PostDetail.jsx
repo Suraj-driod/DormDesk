@@ -5,14 +5,14 @@ import PostDetailBase from "../../components/core/PostDetailBase/PostDetailBase"
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
 import { useAuth } from "../../auth/AuthContext";
-import { fetchIssueById } from "../../Services/issues.service";
-import { fetchAnnouncementById } from "../../Services/announcements.service";
-import { fetchLostItemById } from "../../Services/lostItems.service";
-import { fetchComplaintById } from "../../Services/complaints.service";
-import { fetchCommentsByIssue, addComment, addCommentUpvote, removeCommentUpvote } from "../../Services/issueComments.service";
-import { addUpvote, removeUpvote, hasUserVoted } from "../../Services/issueUpvotes.service";
-import { fetchCommentsByPost, addPostComment } from "../../Services/postComments.service";
-import { addPostUpvote, removePostUpvote, getPostUpvoteCount, hasUserVotedPost } from "../../Services/postUpvotes.service";
+import { fetchIssueById } from "../../services/issues.service";
+import { fetchAnnouncementById } from "../../services/announcements.service";
+import { fetchLostItemById } from "../../services/lostItems.service";
+import { fetchComplaintById } from "../../services/complaints.service";
+import { fetchCommentsByIssue, addComment, addCommentUpvote, removeCommentUpvote } from "../../services/issueComments.service";
+import { addUpvote, removeUpvote, hasUserVoted } from "../../services/issueUpvotes.service";
+import { fetchCommentsByPost, addPostComment } from "../../services/postComments.service";
+import { addPostUpvote, removePostUpvote, getPostUpvoteCount, hasUserVotedPost } from "../../services/postUpvotes.service";
 
 function countCommentTree(nodes) {
   if (!nodes?.length) return 0;

@@ -8,8 +8,8 @@ import {
 import { SelectBetter } from "../../UI/SelectBetter"; 
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { AlertModal } from "../../UI/Glow";
-import { fetchPendingIssues, fetchIssues, assignIssue } from "../../Services/issues.service";
-import { fetchCaretakers } from "../../Services/profile.service";
+import { fetchPendingIssues, fetchIssues, assignIssue } from "../../services/issues.service";
+import { fetchCaretakers } from "../../services/profile.service";
 import { useAuth } from "../../auth/AuthContext";
 import { useAlert } from "../../hooks/useAlert";
 

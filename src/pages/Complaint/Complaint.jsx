@@ -5,8 +5,8 @@ import { Button, AlertModal } from '../../UI/Glow';
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert';
-import { createComplaint } from '../../Services/complaints.service';
-import { uploadToImgBB } from '../../Services/imgbb.service';
+import { createComplaint } from '../../services/complaints.service';
+import { uploadToImgBB } from '../../services/imgbb.service';
 
 const COMPLAINT_TYPES = [
   { value: 'caretaker', label: 'Caretaker' },

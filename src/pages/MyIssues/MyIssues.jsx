@@ -16,17 +16,17 @@ import { SelectBetter } from "../../UI/SelectBetter";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
 import { useAuth } from "../../auth/AuthContext";
-import { fetchIssues } from "../../Services/issues.service";
-import { fetchLostItems } from "../../Services/lostItems.service";
-import { fetchComplaints } from "../../Services/complaints.service";
-import { addUpvote, removeUpvote, hasUserVoted } from "../../Services/issueUpvotes.service";
+import { fetchIssues } from "../../services/issues.service";
+import { fetchLostItems } from "../../services/lostItems.service";
+import { fetchComplaints } from "../../services/complaints.service";
+import { addUpvote, removeUpvote, hasUserVoted } from "../../services/issueUpvotes.service";
 import {
   addPostUpvote,
   removePostUpvote,
   getPostUpvoteCountsBatch,
   getHasVotedBatch,
-} from "../../Services/postUpvotes.service";
-import { getCommentCountsBatch } from "../../Services/postComments.service";
+} from "../../services/postUpvotes.service";
+import { getCommentCountsBatch } from "../../services/postComments.service";
 
 const tabToPostType = (tab) =>
   ({ lost: "lost_found", complaints: "complaint" }[tab] || null);

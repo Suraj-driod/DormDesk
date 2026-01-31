@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { BadgeBetter1 } from '../../UI/BadgeBetter';
 import { AlertModal } from '../../UI/Glow';
-import { fetchLostItems, markItemClaimed, updateLostItemStatus } from '../../Services/lostItems.service';
+import { fetchLostItems, markItemClaimed, updateLostItemStatus } from '../../services/lostItems.service';
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert';
 
