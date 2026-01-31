@@ -13,6 +13,7 @@ export { default as Issues } from "./Issues/Issues";
 export { default as LostFound } from "./LostFound/LostFound";
 export { default as ReportIssue } from "./ReportIssue/ReportIssue";
 export { default as PostDetail } from "./PostDetail/PostDetail";
+export { default as MyIssues } from "./MyIssues/MyIssues";
 
 // Demo
 export { default as PostDemo } from "./PostDemo/PostDemo";

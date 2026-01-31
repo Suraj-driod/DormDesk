@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import { 
   Home, LayoutDashboard, ClipboardList, Megaphone, Plus, Users, User,
-  Settings, Search, AlertTriangle, FileText, Briefcase, Eye
+  Settings, Search, AlertTriangle, FileText, Briefcase, Eye, FolderOpen
 } from "lucide-react";
 
 export function Sidebar({
@@ -42,6 +42,7 @@ export function Sidebar({
     return [
       { key: "/", label: "Home", icon: Home },
       { key: "/feed", label: "Campus Feed", icon: Users },
+      { key: "/my-issues", label: "My Issues", icon: FolderOpen },
       { key: "/report-issue", label: "Report Issue", icon: Plus },
       { key: "/lost-found", label: "Lost & Found", icon: Search },
       { key: "/complaints", label: "Complaints", icon: AlertTriangle },

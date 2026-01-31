@@ -141,6 +141,7 @@ const CaretakerFeed = () => {
               comments: 0,
               visibility: "public",
               target: `${ann.target_hostel}${ann.target_block ? ` - ${ann.target_block}` : ""}`,
+              media: (ann.image_url || ann.media_url) ? { type: "image", url: ann.image_url || ann.media_url } : null,
             };
           }));
           data = annList.sort((a, b) => b.timestamp - a.timestamp);
@@ -175,6 +176,7 @@ const CaretakerFeed = () => {
               comments: 0,
               visibility: "public",
               location: item.location,
+              media: item.image_url ? { type: "image", url: item.image_url } : null,
             };
           }));
           data = lostList.sort((a, b) => b.timestamp - a.timestamp);
@@ -209,6 +211,7 @@ const CaretakerFeed = () => {
               comments: 0,
               visibility: "private",
               type: comp.complaint_type,
+              media: (comp.media_url || comp.image_url) ? { type: "image", url: comp.media_url || comp.image_url } : null,
             };
           }));
           data = compList.sort((a, b) => b.timestamp - a.timestamp);

@@ -2,21 +2,20 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
-  Megaphone,
-  Users,
+  ClipboardList,
   Search,
   AlertTriangle,
-  Plus,
   FileText,
   Loader2,
+  Lock,
+  Globe,
 } from "lucide-react";
 
 import PostBase from "../../components/core/PostBase/PostBase";
 import { SelectBetter } from "../../UI/SelectBetter";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { useAuth } from "../../auth/AuthContext";
-import { fetchIssuesForFeed } from "../../Services/issues.service";
-import { fetchAnnouncements } from "../../Services/announcements.service";
+import { fetchIssues } from "../../Services/issues.service";
 import { fetchLostItems } from "../../Services/lostItems.service";
 import { fetchComplaints } from "../../Services/complaints.service";
 import { addUpvote, removeUpvote, hasUserVoted } from "../../Services/issueUpvotes.service";
@@ -29,7 +28,7 @@ import {
 import { getCommentCountsBatch } from "../../Services/postComments.service";
 
 const tabToPostType = (tab) =>
-  ({ announcements: "announcement", lost: "lost_found", complaints: "complaint" }[tab] || null);
+  ({ lost: "lost_found", complaints: "complaint" }[tab] || null);
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
@@ -38,30 +37,32 @@ const SORT_OPTIONS = [
 ];
 
 const TABS = [
-  { id: "issues", label: "Public Issues", icon: Users },
-  { id: "announcements", label: "Announcements", icon: Megaphone },
+  { id: "issues", label: "My Issues", icon: ClipboardList },
   { id: "lost", label: "Lost Items", icon: Search },
   { id: "complaints", label: "Complaints", icon: AlertTriangle },
 ];
 
-const Feed = () => {
+const MyIssues = () => {
   const navigate = useNavigate();
-  const { isStudent, isAdmin, profile, user } = useAuth();
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState("issues");
   const [sortOrder, setSortOrder] = useState("newest");
   const [currentData, setCurrentData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [votedPosts, setVotedPosts] = useState({});
 
+  const uid = user?.uid || profile?.id;
+
   useEffect(() => {
+    if (!uid) return;
     fetchData();
-  }, [activeTab, profile]);
+  }, [activeTab, uid]);
 
   const handleUpvote = useCallback(
     async (postId) => {
       if (!user) return;
-      const postType = tabToPostType(activeTab);
       const isIssue = activeTab === "issues";
+      const postType = tabToPostType(activeTab);
       try {
         const hasVoted = votedPosts[postId];
         if (isIssue) {
@@ -114,93 +115,59 @@ const Feed = () => {
       let data = [];
 
       switch (activeTab) {
-        case "issues":
-          const issues = await fetchIssuesForFeed();
-          data = issues?.map((issue) => ({
-            id: issue.id,
-            title: issue.title,
-            content: issue.description,
-            author: issue.profile?.name || "Anonymous",
-            timestamp: new Date(issue.created_at),
-            status: issue.status,
-            upvotes: issue.upvotes?.[0]?.count || 0,
-            comments: issue.comments?.[0]?.count || 0,
-            visibility: issue.visibility,
-            category: issue.category,
-            priority: issue.priority,
-            repostCount: issue.repost_count || 0,
-            // Media as object (not array) for PostBase
-            media: issue.media_url ? { type: "image", url: issue.media_url } : null,
-          })) || [];
-          
-          // Check which issues user has voted on
+        case "issues": {
+          const issues = await fetchIssues({ created_by: uid });
+          data =
+            issues?.map((issue) => ({
+              id: issue.id,
+              title: issue.title,
+              content: issue.description,
+              author: issue.profile?.name || "You",
+              timestamp: new Date(issue.created_at),
+              status: issue.status,
+              upvotes: issue.upvotes?.[0]?.count || 0,
+              comments: issue.comments?.[0]?.count || 0,
+              visibility: issue.visibility,
+              category: issue.category,
+              priority: issue.priority,
+              repostCount: issue.repost_count || 0,
+              media: issue.media_url ? { type: "image", url: issue.media_url } : null,
+            })) || [];
           if (user?.uid && issues?.length) {
             const voteChecks = await Promise.all(
-              issues.map(issue => hasUserVoted(issue.id, user.uid))
+              issues.map((issue) => hasUserVoted(issue.id, user.uid))
             );
             const newVotedPosts = {};
             issues.forEach((issue, idx) => {
               newVotedPosts[issue.id] = voteChecks[idx];
             });
-            setVotedPosts(prev => ({ ...prev, ...newVotedPosts }));
-          }
-          break;
-
-        case "announcements": {
-          const announcements = await fetchAnnouncements();
-          data =
-            announcements?.map((ann) => ({
-              id: ann.id,
-              title: ann.title,
-              content: ann.content,
-              author: ann.profile?.name || "Admin",
-              timestamp: new Date(ann.created_at),
-              status: "Published",
-              upvotes: 0,
-              comments: 0,
-              visibility: "public",
-              target: `${ann.target_hostel}${ann.target_block ? ` - ${ann.target_block}` : ""}`,
-              media: (ann.image_url || ann.media_url) ? { type: "image", url: ann.image_url || ann.media_url } : null,
-            })) || [];
-          const annIds = data.map((p) => p.id);
-          if (annIds.length) {
-            const [upvoteCounts, commentCounts, votedMap] = await Promise.all([
-              getPostUpvoteCountsBatch("announcement", annIds),
-              getCommentCountsBatch("announcement", annIds),
-              user?.uid ? getHasVotedBatch("announcement", annIds, user.uid) : Promise.resolve({}),
-            ]);
-            data = data.map((p) => ({
-              ...p,
-              upvotes: upvoteCounts[p.id] ?? 0,
-              comments: commentCounts[p.id] ?? 0,
-            }));
-            setVotedPosts((prev) => ({ ...prev, ...votedMap }));
+            setVotedPosts((prev) => ({ ...prev, ...newVotedPosts }));
           }
           break;
         }
 
         case "lost": {
-          const lostItems = await fetchLostItems({ status: "lost" });
-          data =
-            lostItems?.map((item) => ({
-              id: item.id,
-              title: item.title,
-              content: item.description,
-              author: item.reported_by_profile?.name || "Anonymous",
-              timestamp: new Date(item.created_at),
-              status: item.status,
-              upvotes: 0,
-              comments: 0,
-              visibility: "public",
-              location: item.location,
-              media: item.image_url ? { type: "image", url: item.image_url } : null,
-            })) || [];
+          const allLost = await fetchLostItems();
+          const lostItems = (allLost || []).filter((item) => item.reported_by === uid);
+          data = lostItems.map((item) => ({
+            id: item.id,
+            title: item.title,
+            content: item.description,
+            author: item.reported_by_profile?.name || "You",
+            timestamp: new Date(item.created_at),
+            status: item.status,
+            upvotes: 0,
+            comments: 0,
+            visibility: "public",
+            location: item.location,
+            media: item.image_url ? { type: "image", url: item.image_url } : null,
+          }));
           const lostIds = data.map((p) => p.id);
-          if (lostIds.length) {
+          if (lostIds.length && user?.uid) {
             const [upvoteCounts, commentCounts, votedMap] = await Promise.all([
               getPostUpvoteCountsBatch("lost_found", lostIds),
               getCommentCountsBatch("lost_found", lostIds),
-              user?.uid ? getHasVotedBatch("lost_found", lostIds, user.uid) : Promise.resolve({}),
+              getHasVotedBatch("lost_found", lostIds, user.uid),
             ]);
             data = data.map((p) => ({
               ...p,
@@ -213,28 +180,28 @@ const Feed = () => {
         }
 
         case "complaints": {
-          const complaintsFilters = isStudent ? { raised_by: profile?.id } : {};
-          const complaints = await fetchComplaints(complaintsFilters);
-          data =
-            complaints?.map((comp) => ({
-              id: comp.id,
-              title: `${comp.complaint_type} Complaint`,
-              content: comp.description,
-              author: comp.raised_by_profile?.name || "Anonymous",
-              timestamp: new Date(comp.created_at),
-              status: comp.status,
-              upvotes: 0,
-              comments: 0,
-              visibility: "private",
-              type: comp.complaint_type,
-              media: (comp.media_url || comp.image_url) ? { type: "image", url: comp.media_url || comp.image_url } : null,
-            })) || [];
+          const complaints = await fetchComplaints({ raised_by: profile?.id || uid });
+          data = complaints?.map((comp) => ({
+            id: comp.id,
+            title: `${comp.complaint_type} Complaint`,
+            content: comp.description,
+            author: comp.raised_by_profile?.name || "You",
+            timestamp: new Date(comp.created_at),
+            status: comp.status,
+            upvotes: 0,
+            comments: 0,
+            visibility: "private",
+            type: comp.complaint_type,
+            media: (comp.media_url || comp.image_url)
+              ? { type: "image", url: comp.media_url || comp.image_url }
+              : null,
+          })) || [];
           const compIds = data.map((p) => p.id);
-          if (compIds.length) {
+          if (compIds.length && user?.uid) {
             const [upvoteCounts, commentCounts, votedMap] = await Promise.all([
               getPostUpvoteCountsBatch("complaint", compIds),
               getCommentCountsBatch("complaint", compIds),
-              user?.uid ? getHasVotedBatch("complaint", compIds, user.uid) : Promise.resolve({}),
+              getHasVotedBatch("complaint", compIds, user.uid),
             ]);
             data = data.map((p) => ({
               ...p,
@@ -249,7 +216,7 @@ const Feed = () => {
 
       setCurrentData(data);
     } catch (error) {
-      console.error("Error fetching feed data:", error);
+      console.error("Error fetching my issues:", error);
       setCurrentData([]);
     } finally {
       setLoading(false);
@@ -266,38 +233,15 @@ const Feed = () => {
     });
   }, [currentData, sortOrder]);
 
-  const actionConfig = useMemo(() => {
-    if (!isStudent) return null; // Only students can report
-    
-    switch (activeTab) {
-      case "issues":
-        return { text: "Report Issue", icon: Plus, path: "/report-issue" };
-      case "lost":
-        return { text: "Report Item", icon: Search, path: "/lost-found" };
-      case "complaints":
-        return { text: "File Complaint", icon: AlertTriangle, path: "/complaints" };
-      default:
-        return null;
-    }
-  }, [activeTab, isStudent]);
-
-  const handleAction = () => {
-    if (actionConfig?.path) {
-      navigate(actionConfig.path);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-['Poppins',sans-serif]">
-      {/* Header */}
       <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b shadow-sm">
         <div className="max-w-5xl mx-auto px-4 py-5">
-          <h1 className="text-3xl font-bold text-gray-800">Campus Feed</h1>
+          <h1 className="text-3xl font-bold text-gray-800">My Issues</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Stay updated with the latest happenings
+            Your reported issues, lost items, and complaints
           </p>
 
-          {/* Tabs */}
           <div className="mt-6 overflow-x-auto">
             <div className="flex gap-2 min-w-max">
               {TABS.map((tab) => (
@@ -314,7 +258,7 @@ const Feed = () => {
                 >
                   {activeTab === tab.id && (
                     <motion.div
-                      layoutId="activeFeedTab"
+                      layoutId="myIssuesTab"
                       className="absolute inset-0 bg-[#E0F7FA] rounded-xl"
                     />
                   )}
@@ -329,7 +273,6 @@ const Feed = () => {
         </div>
       </div>
 
-      {/* Content */}
       <div className="max-w-5xl mx-auto px-4 py-6">
         <div className="flex justify-end mb-6">
           <div className="w-full md:w-56">
@@ -347,7 +290,7 @@ const Feed = () => {
             {loading ? (
               <motion.div className="py-20 flex flex-col items-center text-gray-400">
                 <Loader2 className="animate-spin mb-3" size={36} />
-                <p className="text-sm">Loading {activeTab}...</p>
+                <p className="text-sm">Loading...</p>
               </motion.div>
             ) : sortedData.length ? (
               sortedData.map((post) => (
@@ -391,11 +334,23 @@ const Feed = () => {
                       },
                     ]}
                     extras={
-                      post.repostCount > 0 && (
-                        <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
-                          {post.repostCount} similar reports
-                        </span>
-                      )
+                      <>
+                        {post.visibility === "private" && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                            <Lock size={10} /> Private
+                          </span>
+                        )}
+                        {post.visibility === "public" && activeTab === "issues" && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#E0F7FA] text-[#00838F] border border-[#B2EBF2]">
+                            <Globe size={10} /> Public
+                          </span>
+                        )}
+                        {post.repostCount > 0 && (
+                          <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
+                            {post.repostCount} similar reports
+                          </span>
+                        )}
+                      </>
                     }
                   />
                 </motion.div>
@@ -406,49 +361,18 @@ const Feed = () => {
                   <FileText size={40} className="text-gray-300" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-700">
-                  No {activeTab} yet
+                  No {activeTab === "issues" ? "issues" : activeTab} yet
                 </h3>
                 <p className="text-gray-500 text-sm">
-                  {isStudent ? "Be the first to post!" : "Nothing to display."}
+                  Reports and complaints you create will appear here.
                 </p>
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
       </div>
-
-      {/* Desktop CTA - Only for students */}
-      {actionConfig && (
-        <motion.div className="fixed bottom-10 right-10 z-50 hidden md:block">
-          <motion.button
-            onClick={handleAction}
-            whileHover={{
-              scale: 1.08,
-              boxShadow: "0 12px 40px rgba(0,229,255,0.55)",
-            }}
-            whileTap={{ scale: 0.96 }}
-            className="px-8 py-4 rounded-full bg-gradient-to-r from-[#00B8D4] via-[#00D9F5] to-[#00E5FF] text-white font-extrabold tracking-wide flex items-center gap-3 shadow-lg"
-          >
-            <actionConfig.icon size={22} strokeWidth={2.7} />
-            {actionConfig.text}
-          </motion.button>
-        </motion.div>
-      )}
-
-      {/* Mobile FAB - Only for students */}
-      {actionConfig && (
-        <motion.div className="fixed bottom-7 right-7 z-50 md:hidden">
-          <motion.button
-            onClick={handleAction}
-            whileTap={{ scale: 0.9 }}
-            className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#00B8D4] to-[#00E5FF] text-white shadow-xl flex items-center justify-center"
-          >
-            <actionConfig.icon size={28} strokeWidth={2.8} />
-          </motion.button>
-        </motion.div>
-      )}
     </div>
   );
 };
 
-export default Feed;
+export default MyIssues;
