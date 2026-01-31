@@ -31,7 +31,7 @@ const PriorityDot = ({ priority }) => {
 };
 
 const IssuesAdmin = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -124,7 +124,7 @@ const IssuesAdmin = () => {
   // Status update handler
   const handleStatusChange = async (issueId, newStatus) => {
     try {
-      await updateIssueStatus(issueId, newStatus, user?.id);
+      await updateIssueStatus(issueId, newStatus, user?.uid ?? profile?.id ?? profile?.managementDocId);
       setIssues(prev => prev.map(issue => 
         issue.id === issueId ? { ...issue, status: newStatus } : issue
       ));
