@@ -223,7 +223,7 @@ const Heatmap = ({ compact = false }) => {
       {/* Legend (only in full mode) */}
       {!compact && (
         <div className="mt-4 pt-4 border-t border-gray-100 flex items-center justify-center gap-6 text-xs text-gray-500">
-          <div className="flex items-center gap-1.5">
+          {/* <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-full bg-gray-200"></div>
             <span>Low</span>
           </div>
@@ -234,7 +234,7 @@ const Heatmap = ({ compact = false }) => {
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-400 to-red-500 shadow-[0_0_10px_rgba(255,100,100,0.5)]"></div>
             <span>High</span>
-          </div>
+          </div> */}
         </div>
       )}
     </div>
