@@ -160,17 +160,18 @@ const Profile = () => {
 
   // Role-specific stats
   const renderStats = () => {
-    if (!profile.stats) return null;
-
     if (isAdmin) {
+      const s = profile.stats || {};
       return (
         <div className="flex gap-4">
-          <StatCard label="Total Issues" count={profile.stats.totalIssues} color="bg-blue-400" icon={BarChart3} />
-          <StatCard label="Announcements" count={profile.stats.announcements} color="bg-green-400" icon={BarChart3} />
-          <StatCard label="Pending Complaints" count={profile.stats.pendingComplaints} color="bg-orange-400" icon={BarChart3} />
+          <StatCard label="Total Issues" count={s.totalIssues ?? 0} color="bg-blue-400" icon={BarChart3} />
+          <StatCard label="Announcements" count={s.announcements ?? 0} color="bg-green-400" icon={BarChart3} />
+          <StatCard label="Pending Complaints" count={s.pendingComplaints ?? 0} color="bg-orange-400" icon={BarChart3} />
         </div>
       );
     }
+
+    if (!profile.stats) return null;
 
     if (isCaretaker) {
       return (
