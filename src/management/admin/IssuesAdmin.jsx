@@ -6,9 +6,11 @@ import {
 
 import { SelectBetter } from "../../UI/SelectBetter"; 
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { AlertModal } from "../../UI/Glow";
 import Heatmap from "../../components/Heatmap/Heatmap";
 import { fetchIssues, updateIssueStatus, updateIssuePriority } from "../../Services/issues.service";
 import { useAuth } from "../../auth/AuthContext";
+import { useAlert } from "../../hooks/useAlert";
 
 // Priority Dot helper
 const PriorityDot = ({ priority }) => {
@@ -33,6 +35,7 @@ const IssuesAdmin = () => {
   const [issues, setIssues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { alertState, closeAlert, error: showError } = useAlert();
   
   // UI State
   const [activeTab, setActiveTab] = useState("public");
@@ -80,7 +83,7 @@ const IssuesAdmin = () => {
         issue.title?.toLowerCase().includes(query) ||
         issue.description?.toLowerCase().includes(query) ||
         issue.room_no?.toLowerCase().includes(query) ||
-        issue.profiles?.name?.toLowerCase().includes(query);
+        issue.profile?.name?.toLowerCase().includes(query);
 
       if (!matchesSearch) return false;
 
@@ -125,9 +128,9 @@ const IssuesAdmin = () => {
       setIssues(prev => prev.map(issue => 
         issue.id === issueId ? { ...issue, status: newStatus } : issue
       ));
-    } catch (error) {
-      console.error("Error updating status:", error);
-      alert("Failed to update status");
+    } catch (err) {
+      console.error("Error updating status:", err);
+      showError("Failed to update status");
     }
   };
 
@@ -136,7 +139,7 @@ const IssuesAdmin = () => {
     const csvContent = "data:text/csv;charset=utf-8," 
       + ["Title,Category,Priority,Status,Hostel,Block,Room,Author,Date,Reposts"].join(",") + "\n"
       + filteredData.map(e => 
-        `"${e.title}","${e.category}","${e.priority}","${e.status}","${e.hostel}","${e.block}","${e.room_no}","${e.profiles?.name || 'Unknown'}","${new Date(e.created_at).toLocaleDateString()}","${e.repost_count || 0}"`
+        `"${e.title}","${e.category}","${e.priority}","${e.status}","${e.hostel}","${e.block}","${e.room_no}","${e.profile?.name || 'Unknown'}","${new Date(e.created_at).toLocaleDateString()}","${e.repost_count || 0}"`
       ).join("\n");
     
     const link = document.createElement("a");
@@ -149,6 +152,8 @@ const IssuesAdmin = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-7xl mx-auto">
         
         {/* Heatmap Section */}
@@ -293,7 +298,7 @@ const IssuesAdmin = () => {
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="text-sm font-medium text-gray-800">
-                            {issue.profiles?.name || 'Unknown'}
+                            {issue.profile?.name || 'Unknown'}
                           </span>
                           <span className="text-xs text-gray-400">
                             {new Date(issue.created_at).toLocaleDateString()}

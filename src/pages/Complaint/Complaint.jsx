@@ -1,9 +1,10 @@
 import { useForm } from 'react-hook-form';
 import { useRef, useState, useEffect } from 'react';
 import { theme } from '../../theme';
-import { Button } from '../../UI/Glow'; 
+import { Button, AlertModal } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
-import { useAuth } from '../../auth/AuthContext'; 
+import { useAuth } from '../../auth/AuthContext';
+import { useAlert } from '../../hooks/useAlert'; 
 
 // Options as requested
 const COMPLAINT_TYPES = [
@@ -18,6 +19,7 @@ const Complaint = () => {
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
+  const { alertState, closeAlert, success: showSuccess, error: showError, warning: showWarning } = useAlert();
 
   const {
     register,
@@ -45,12 +47,11 @@ const Complaint = () => {
 
   const onSubmit = async (data) => {
     if (!user) {
-      alert("Please login to submit a complaint.");
+      showWarning("Please login to submit a complaint.");
       return;
     }
 
     try {
-      // 1. Upload Media (Optional)
       let mediaUrl = null;
       if (data.media) {
         const file = data.media;
@@ -71,7 +72,6 @@ const Complaint = () => {
         mediaUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Insert into 'complaints' table
       const { error: insertError } = await supabase
         .from('complaints')
         .insert([
@@ -80,24 +80,23 @@ const Complaint = () => {
             description: data.description,
             accused_user: data.accusedName,
             raised_by: user.id,
-            
-            // ✅ FIX: Using the exact Enum value from your list
             status: 'submitted', 
-            
-            // media_url: mediaUrl // Uncomment if you add this column
           }
         ]);
 
       if (insertError) throw insertError;
 
-      alert('Complaint submitted successfully!');
-      reset();
-      setMediaPreview(null);
-      setMediaType(null);
+      showSuccess('Complaint submitted successfully!', {
+        onClose: () => {
+          reset();
+          setMediaPreview(null);
+          setMediaType(null);
+        }
+      });
 
-    } catch (error) {
-      console.error('Error submitting complaint:', error);
-      alert('Failed to submit: ' + error.message);
+    } catch (err) {
+      console.error('Error submitting complaint:', err);
+      showError('Failed to submit: ' + err.message);
     }
   };
 
@@ -115,13 +114,13 @@ const Complaint = () => {
     if (!file) return;
     const maxSize = 50 * 1024 * 1024; 
     if (file.size > maxSize) {
-      alert('File size must be less than 50MB');
+      showWarning('File size must be less than 50MB');
       return;
     }
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
     if (!isVideo && !isImage) {
-      alert('Please upload an image or video file');
+      showWarning('Please upload an image or video file');
       return;
     }
     setMediaType(isVideo ? 'video' : 'image');
@@ -167,6 +166,8 @@ const Complaint = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FEFF] to-white py-8 px-4">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">File a Complaint</h1>

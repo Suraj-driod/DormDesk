@@ -2,8 +2,9 @@ import { useForm } from 'react-hook-form';
 import { useState, useRef, useEffect } from 'react';
 import { theme } from '../../theme';
 import { SelectBetter } from '../../UI/SelectBetter';
-import { Button } from '../../UI/Glow'; 
-import { useAuth } from '../../auth/AuthContext'; 
+import { Button, AlertModal } from '../../UI/Glow'; 
+import { useAuth } from '../../auth/AuthContext';
+import { useAlert } from '../../hooks/useAlert'; 
 
 // 1. Categories (Matches issue_category Enum)
 const CATEGORIES = [
@@ -35,6 +36,7 @@ const ReportIssue = () => {
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
+  const { alertState, closeAlert, success: showSuccess, error: showError, warning: showWarning } = useAlert();
 
   const {
     register,
@@ -77,7 +79,7 @@ const ReportIssue = () => {
   // --- SUBMISSION HANDLER ---
   const onSubmit = async (data) => {
     if (!user) {
-      alert("You must be logged in to submit an issue.");
+      showWarning("You must be logged in to submit an issue.");
       return;
     }
 
@@ -110,13 +112,10 @@ const ReportIssue = () => {
           {
             title: data.title,
             description: data.description,
-            
-            // Enum Mapping
             category: data.category, 
-            priority: data.urgency,      // Sending 'Medium' (Matches issue_priority)
-            status: 'Reported',          // Sending 'Reported' (Matches issue_status)
-            visibility: data.visibility, // Sending 'Public' (Matches issue_visibility_type)
-            
+            priority: data.urgency,
+            status: 'Reported',
+            visibility: data.visibility,
             created_by: user.id,
             hostel: data.hostelName,
             block: data.block,
@@ -127,14 +126,17 @@ const ReportIssue = () => {
 
       if (insertError) throw insertError;
 
-      alert('Issue submitted successfully!');
-      reset(); 
-      setMediaPreview(null);
-      setMediaType(null);
+      showSuccess("Issue submitted successfully!", { 
+        onClose: () => {
+          reset(); 
+          setMediaPreview(null);
+          setMediaType(null);
+        }
+      });
 
-    } catch (error) {
-      console.error('Error submitting issue:', error);
-      alert('Failed to submit issue: ' + error.message);
+    } catch (err) {
+      console.error('Error submitting issue:', err);
+      showError('Failed to submit issue: ' + err.message);
     }
   };
 
@@ -153,7 +155,7 @@ const ReportIssue = () => {
 
     const maxSize = 50 * 1024 * 1024; 
     if (file.size > maxSize) {
-      alert('File size must be less than 50MB');
+      showWarning('File size must be less than 50MB');
       return;
     }
 
@@ -161,7 +163,7 @@ const ReportIssue = () => {
     const isImage = file.type.startsWith('image/');
 
     if (!isVideo && !isImage) {
-      alert('Please upload an image or video file');
+      showWarning('Please upload an image or video file');
       return;
     }
 
@@ -209,6 +211,8 @@ const ReportIssue = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FEFF] to-white py-8 px-4">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Report an Issue</h1>

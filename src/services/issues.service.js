@@ -7,7 +7,7 @@ export const fetchIssues = async (filters = {}) => {
     .from("issues")
     .select(`
       *,
-      profiles:created_by (id, name, hostel, block, room_no),
+      profile:created_by (id, name, hostel, block, room_no),
       assigned_profile:assigned_to (id, name),
       upvotes:issue_upvotes (count),
       comments:issue_comments (count)
@@ -49,7 +49,7 @@ export const fetchIssueById = async (id) => {
     .from("issues")
     .select(`
       *,
-      profiles:created_by (id, name, email, hostel, block, room_no),
+      profile:created_by (id, name, email, hostel, block, room_no),
       assigned_profile:assigned_to (id, name, email),
       upvotes:issue_upvotes (count),
       comments:issue_comments (
@@ -180,7 +180,7 @@ export const fetchIssuesForFeed = async () => {
     .from("issues")
     .select(`
       id, title, description, created_at, status, visibility, category, priority, repost_count,
-      profiles:created_by (name),
+      profile:created_by (name),
       upvotes:issue_upvotes (count),
       comments:issue_comments (count)
     `)
@@ -197,7 +197,7 @@ export const fetchAssignedIssues = async (caretakerId) => {
     .from("issues")
     .select(`
       *,
-      profiles:created_by (id, name, hostel, block, room_no)
+      profile:created_by (id, name, hostel, block, room_no)
     `)
     .eq("assigned_to", caretakerId)
     .order("created_at", { ascending: false });
@@ -234,7 +234,7 @@ export const fetchPendingIssues = async () => {
     .from("issues")
     .select(`
       *,
-      profiles:created_by (id, name, hostel, block, room_no)
+      profile:created_by (id, name, hostel, block, room_no)
     `)
     .is("assigned_to", null)
     .eq("status", "reported")

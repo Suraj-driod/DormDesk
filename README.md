@@ -61,7 +61,7 @@
   - Image upload for better identification
   - Community-driven recovery
 
-- **👤 User Profiles**
+- **👤 User profile**
   - Personal dashboard
   - Issue history tracking
   - Profile customization

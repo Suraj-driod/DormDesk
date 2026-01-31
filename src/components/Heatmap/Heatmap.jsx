@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Wifi, Wrench, Zap, Sparkles, HelpCircle, TrendingUp } from "lucide-react";
-import { supabase } from "../../Lib/supabaseClient";
+import { useAuth } from "../../auth/AuthContext";
 
 const CATEGORY_CONFIG = {
   wifi: { 
@@ -42,15 +42,31 @@ const CATEGORY_CONFIG = {
 };
 
 const Heatmap = ({ compact = false }) => {
+  const { user, loading: authLoading, supabase } = useAuth();
   const [categoryStats, setCategoryStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalIssues, setTotalIssues] = useState(0);
 
   useEffect(() => {
-    fetchCategoryStats();
-  }, []);
+    // Only fetch when auth is ready and user exists
+    if (!authLoading && user) {
+      fetchCategoryStats();
+    } else if (!authLoading && !user) {
+      // No user, show empty state
+      setLoading(false);
+      setCategoryStats(
+        Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
+          category: key,
+          count: 0,
+          percentage: 0,
+          ...config,
+        }))
+      );
+    }
+  }, [authLoading, user]);
 
   const fetchCategoryStats = async () => {
+    setLoading(true);
     try {
       const { data, error } = await supabase
         .from("issues")

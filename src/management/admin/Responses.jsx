@@ -7,7 +7,9 @@ import {
 
 // --- Custom Components ---
 import { SelectBetter } from "../../UI/SelectBetter"; 
-import { BadgeBetter1 } from "../../UI/BadgeBetter"; 
+import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { AlertModal } from "../../UI/Glow";
+import { useAlert } from "../../hooks/useAlert"; 
 
 // --- MOCK DATA ---
 const MOCK_RESPONSES = [
@@ -54,6 +56,7 @@ const MOCK_RESPONSES = [
 
 const Responses = () => {
   const [responses, setResponses] = useState(MOCK_RESPONSES);
+  const { alertState, closeAlert, success: showSuccess, info: showInfo } = useAlert();
   
   // --- UI STATE ---
   const [activeTab, setActiveTab] = useState("pending");
@@ -70,13 +73,13 @@ const Responses = () => {
   const handleVerify = (id) => {
     if(!window.confirm("Mark this issue as Verified and Closed?")) return;
     setResponses(prev => prev.map(r => r.id === id ? { ...r, status: 'Verified' } : r));
-    alert("Issue Verified successfully!");
+    showSuccess("Issue Verified successfully!");
   };
 
   const handleReject = (id) => {
     const reason = prompt("Enter reason for rejection:");
     if (reason) {
-      alert(`Response rejected. Reason: ${reason}`);
+      showInfo(`Response rejected. Reason: ${reason}`);
     }
   };
 
@@ -117,6 +120,8 @@ const Responses = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-7xl mx-auto">
         
         {/* --- HEADER --- */}

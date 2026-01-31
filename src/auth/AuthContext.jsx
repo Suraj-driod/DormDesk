@@ -1,15 +1,19 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../Lib/supabaseClient";
 
 const AuthContext = createContext(null);
+
+// Auth initialization timeout (5 seconds max)
+const AUTH_TIMEOUT_MS = 5000;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const isMountedRef = useRef(true);
 
-  // Fetch user profile from profiles or management table
+  // Fetch user profile from profile or management table
   const fetchProfile = useCallback(async (userId) => {
     if (!userId) return null;
 
@@ -24,15 +28,15 @@ export const AuthProvider = ({ children }) => {
       if (mgmtData && !mgmtError) {
         return {
           ...mgmtData,
-          role: mgmtData.role, // 'admin' or 'caretaker'
+          role: mgmtData.role,
           name: mgmtData.full_name,
           hostel: mgmtData.hostel_block,
         };
       }
 
-      // Fallback to profiles table (student)
+      // Fallback to profile table (student)
       const { data: profileData, error: profileError } = await supabase
-        .from("profiles")
+        .from("profile")
         .select("*")
         .eq("id", userId)
         .single();
@@ -66,35 +70,70 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Initial session
-    supabase.auth.getSession().then(async ({ data }) => {
-      setSession(data.session);
-      setUser(data.session?.user || null);
-      
-      if (data.session?.user) {
-        const userProfile = await fetchProfile(data.session.user.id);
-        setProfile(userProfile);
-      }
-      
-      setLoading(false);
-    });
+    isMountedRef.current = true;
+    let timeoutId;
+    let initialized = false;
 
-    // Listen to auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user || null);
-        
-        if (session?.user) {
-          const userProfile = await fetchProfile(session.user.id);
-          setProfile(userProfile);
+    const completeInit = () => {
+      if (!initialized && isMountedRef.current) {
+        initialized = true;
+        setLoading(false);
+        clearTimeout(timeoutId);
+      }
+    };
+
+    // Safety timeout - ensures loading stops even if auth hangs
+    timeoutId = setTimeout(() => {
+      console.warn("Auth timeout - forcing loading complete");
+      completeInit();
+    }, AUTH_TIMEOUT_MS);
+
+    // Set up auth state listener FIRST (before getSession)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, currentSession) => {
+        console.log("Auth event:", event);
+        if (!isMountedRef.current) return;
+
+        // Handle session update
+        setSession(currentSession);
+        setUser(currentSession?.user || null);
+
+        if (currentSession?.user) {
+          const userProfile = await fetchProfile(currentSession.user.id);
+          if (isMountedRef.current) setProfile(userProfile);
         } else {
           setProfile(null);
         }
+
+        // Complete initialization on any auth event
+        completeInit();
       }
     );
 
-    return () => listener.subscription.unsubscribe();
+    // Check for existing session
+    supabase.auth.getSession().then(async ({ data: { session: existingSession }, error }) => {
+      if (error) console.error("getSession error:", error);
+      if (!isMountedRef.current || initialized) return;
+
+      setSession(existingSession);
+      setUser(existingSession?.user || null);
+
+      if (existingSession?.user) {
+        const userProfile = await fetchProfile(existingSession.user.id);
+        if (isMountedRef.current) setProfile(userProfile);
+      }
+
+      completeInit();
+    }).catch((err) => {
+      console.error("Session check failed:", err);
+      completeInit();
+    });
+
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   // Refresh profile data

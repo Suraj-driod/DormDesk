@@ -5,10 +5,11 @@ import {
   LogOut, Edit2, Shield, Camera, Briefcase, BarChart3
 } from "lucide-react";
 import { theme } from "../../theme";
-import { Button } from "../../UI/Glow";
+import { Button, AlertModal } from "../../UI/Glow";
 import { NotFound } from "../../UI/Glow";
 import { useAuth } from "../../auth/AuthContext";
 import { fetchUserProfile, updateUserProfile } from "../../Services/profile.service";
+import { useAlert } from "../../hooks/useAlert";
 
 const Profile = () => {
   const { user, profile: authProfile, logout, refreshProfile, isAdmin, isCaretaker, isStudent } = useAuth();
@@ -16,6 +17,7 @@ const Profile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editForm, setEditForm] = useState({});
+  const { alertState, closeAlert, error: showError } = useAlert();
 
   useEffect(() => {
     if (!user) return;
@@ -45,9 +47,9 @@ const Profile = () => {
       await loadProfile();
       await refreshProfile();
       setIsEditing(false);
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      alert("Failed to update profile");
+    } catch (err) {
+      console.error("Error updating profile:", err);
+      showError("Failed to update profile. Please try again.");
     }
   };
 
@@ -148,6 +150,8 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FEFF] to-white py-8 px-4 font-['Poppins',sans-serif]">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <motion.div 
         className="max-w-4xl mx-auto"
         initial={{ opacity: 0 }}

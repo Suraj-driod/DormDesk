@@ -6,7 +6,6 @@ import {
   ChevronLeft, ChevronRight, Clock, TrendingUp 
 } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
-import { supabase } from "../../Lib/supabaseClient";
 import Heatmap from "../../components/Heatmap/Heatmap";
 import QuickReportFAB from "../../components/QuickReportFAB/QuickReportFAB";
 
@@ -20,7 +19,7 @@ const SLIDESHOW_IMAGES = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile, isAdmin, isCaretaker, isStudent } = useAuth();
+  const { profile, isAdmin, isCaretaker, isStudent, user, loading: authLoading, supabase } = useAuth();
   
   // Slideshow state
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -28,10 +27,21 @@ export default function Dashboard() {
   const [slides, setSlides] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch dynamic slide data
+  // Fetch dynamic slide data - wait for auth
   useEffect(() => {
-    fetchSlideData();
-  }, []);
+    if (!authLoading && user) {
+      fetchSlideData();
+    } else if (!authLoading && !user) {
+      // No user, show fallback slides
+      setSlides([
+        { category: "Welcome", title: "DormDesk - Your Hostel Companion", icon: Users, color: "text-[#00B8D4]", path: "/" },
+        { category: "Report Issues", title: "Quick and easy issue reporting", icon: AlertTriangle, color: "text-[#FB923C]", path: "/report-issue" },
+        { category: "Lost Something?", title: "Report lost items instantly", icon: Search, color: "text-[#A78BFA]", path: "/lost-found" },
+        { category: "Stay Updated", title: "Get hostel announcements", icon: Megaphone, color: "text-[#2DD4BF]", path: "/announcements" },
+      ]);
+      setLoading(false);
+    }
+  }, [authLoading, user]);
 
   const fetchSlideData = async () => {
     try {

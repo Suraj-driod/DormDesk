@@ -5,6 +5,7 @@ const ImageUpload = ({
   label,
   helperText,
   onChange,
+  onValidationError,
   error,
   required = false,
   accept = 'image/*',
@@ -14,13 +15,17 @@ const ImageUpload = ({
   const [preview, setPreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [fileName, setFileName] = useState('');
+  const [validationError, setValidationError] = useState('');
   const inputRef = useRef(null);
 
   const handleFile = (file) => {
     if (!file) return;
+    setValidationError('');
 
     if (file.size > maxSize) {
-      alert(`File size must be less than ${maxSize / (1024 * 1024)}MB`);
+      const errMsg = `File size must be less than ${maxSize / (1024 * 1024)}MB`;
+      setValidationError(errMsg);
+      onValidationError?.(errMsg);
       return;
     }
 
@@ -137,10 +142,12 @@ const ImageUpload = ({
         )}
       </div>
 
-      {helperText && !error && (
+      {helperText && !error && !validationError && (
         <span className="text-xs text-gray-400">{helperText}</span>
       )}
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {(error || validationError) && (
+        <span className="text-xs text-red-500">{error || validationError}</span>
+      )}
     </div>
   );
 };

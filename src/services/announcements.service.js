@@ -6,7 +6,7 @@ export const fetchAnnouncements = async (filters = {}) => {
     .from("announcements")
     .select(`
       *,
-      profiles:created_by (id, name, role)
+      profile:created_by (id, name, role)
     `)
     .order("created_at", { ascending: false });
 
@@ -32,7 +32,7 @@ export const fetchAnnouncementById = async (id) => {
     .from("announcements")
     .select(`
       *,
-      profiles:created_by (id, name, role)
+      profile:created_by (id, name, role)
     `)
     .eq("id", id)
     .single();
@@ -88,7 +88,7 @@ export const fetchAnnouncementsForUser = async (userHostel, userBlock) => {
     .from("announcements")
     .select(`
       *,
-      profiles:created_by (id, name)
+      profile:created_by (id, name)
     `)
     .or(`target_hostel.eq.All,target_hostel.eq.${userHostel}`)
     .order("created_at", { ascending: false });
@@ -146,7 +146,7 @@ export const fetchRecentAnnouncements = async (limit = 5) => {
     .from("announcements")
     .select(`
       id, title, content, created_at, target_hostel,
-      profiles:created_by (name)
+      profile:created_by (name)
     `)
     .gte("created_at", sevenDaysAgo.toISOString())
     .order("created_at", { ascending: false })

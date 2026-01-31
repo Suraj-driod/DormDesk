@@ -51,7 +51,7 @@ const CaretakerFeed = () => {
             .from("issues")
             .select(`
               id, title, description, created_at, status, visibility, category, priority,
-              profiles:created_by (name),
+              profile:created_by (name),
               upvotes:issue_upvotes (count),
               comments:issue_comments (count)
             `)
@@ -62,7 +62,7 @@ const CaretakerFeed = () => {
             id: issue.id,
             title: issue.title,
             content: issue.description,
-            author: issue.profiles?.name || "Anonymous",
+            author: issue.profile?.name || "Anonymous",
             timestamp: new Date(issue.created_at),
             status: issue.status,
             upvotes: issue.upvotes?.[0]?.count || 0,
@@ -78,7 +78,7 @@ const CaretakerFeed = () => {
             .from("announcements")
             .select(`
               id, title, content, created_at, target_hostel, target_block,
-              profiles:created_by (name)
+              profile:created_by (name)
             `)
             .order("created_at", { ascending: false });
 
@@ -86,7 +86,7 @@ const CaretakerFeed = () => {
             id: ann.id,
             title: ann.title,
             content: ann.content,
-            author: ann.profiles?.name || "Admin",
+            author: ann.profile?.name || "Admin",
             timestamp: new Date(ann.created_at),
             status: "Published",
             upvotes: 0,
@@ -101,7 +101,7 @@ const CaretakerFeed = () => {
             .from("lost_items")
             .select(`
               id, title, description, created_at, status, location,
-              profiles:reported_by (name)
+              profile:reported_by (name)
             `)
             .order("created_at", { ascending: false });
 
@@ -109,7 +109,7 @@ const CaretakerFeed = () => {
             id: item.id,
             title: item.title,
             content: item.description,
-            author: item.profiles?.name || "Anonymous",
+            author: item.profile?.name || "Anonymous",
             timestamp: new Date(item.created_at),
             status: item.status,
             upvotes: 0,
@@ -124,7 +124,7 @@ const CaretakerFeed = () => {
             .from("complaints")
             .select(`
               id, description, created_at, status, complaint_type,
-              profiles:raised_by (name)
+              profile:raised_by (name)
             `)
             .order("created_at", { ascending: false });
 
@@ -132,7 +132,7 @@ const CaretakerFeed = () => {
             id: comp.id,
             title: `${comp.complaint_type} Complaint`,
             content: comp.description,
-            author: comp.profiles?.name || "Anonymous",
+            author: comp.profile?.name || "Anonymous",
             timestamp: new Date(comp.created_at),
             status: comp.status,
             upvotes: 0,

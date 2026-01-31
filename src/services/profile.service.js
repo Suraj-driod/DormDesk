@@ -20,9 +20,9 @@ export const fetchUserProfile = async (userId) => {
     };
   }
 
-  // Fallback to profiles table (student)
+  // Fallback to profile table (student)
   const { data: profileData, error: profileError } = await supabase
-    .from("profiles")
+    .from("profile")
     .select("*")
     .eq("id", userId)
     .single();
@@ -94,7 +94,7 @@ export const getUserStats = async (userId, role) => {
 
 // Update user profile
 export const updateUserProfile = async (userId, updateData, role) => {
-  const table = role === "admin" || role === "caretaker" ? "management" : "profiles";
+  const table = role === "admin" || role === "caretaker" ? "management" : "profile";
 
   const { data, error } = await supabase
     .from(table)
@@ -110,7 +110,7 @@ export const updateUserProfile = async (userId, updateData, role) => {
 // Create profile (after signup)
 export const createProfile = async (userId, profileData) => {
   const { data, error } = await supabase
-    .from("profiles")
+    .from("profile")
     .insert({
       id: userId,
       ...profileData,

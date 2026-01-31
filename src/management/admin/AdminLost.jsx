@@ -5,8 +5,10 @@ import {
   ArrowRightLeft, Box, User, AlertCircle, RefreshCw
 } from 'lucide-react';
 import { BadgeBetter1 } from '../../UI/BadgeBetter';
+import { AlertModal } from '../../UI/Glow';
 import { fetchLostItems, markItemClaimed, updateLostItemStatus } from '../../Services/lostItems.service';
 import { useAuth } from '../../auth/AuthContext';
+import { useAlert } from '../../hooks/useAlert';
 
 const TABS = [
   { id: 'lost', label: 'Lost Items', icon: AlertCircle },
@@ -18,6 +20,7 @@ const AdminLost = () => {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { alertState, closeAlert, error: showError } = useAlert();
   
   const [activeTab, setActiveTab] = useState('lost');
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,9 +73,9 @@ const AdminLost = () => {
       setItems(prev => prev.map(item => 
         item.id === itemId ? { ...item, status: 'claimed', claimed_at: new Date().toISOString() } : item
       ));
-    } catch (error) {
-      console.error("Error marking claimed:", error);
-      alert("Failed to mark as claimed");
+    } catch (err) {
+      console.error("Error marking claimed:", err);
+      showError("Failed to mark as claimed");
     }
   };
 
@@ -137,6 +140,8 @@ const AdminLost = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}

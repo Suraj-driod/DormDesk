@@ -1,9 +1,10 @@
 import { useForm } from 'react-hook-form';
 import { useRef, useState, useEffect } from 'react';
 import { theme } from '../../theme';
-import { Button } from '../../UI/Glow'; 
+import { Button, AlertModal } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
-import { useAuth } from '../../auth/AuthContext'; // Import Auth Context
+import { useAuth } from '../../auth/AuthContext';
+import { useAlert } from '../../hooks/useAlert';
 
 // Enum values match your DB: {lost, found, claimed}
 const STATUS_OPTIONS = [
@@ -12,10 +13,11 @@ const STATUS_OPTIONS = [
 ];
 
 const LostFound = () => {
-  const { user, supabase } = useAuth(); // Auth Hook
+  const { user, supabase } = useAuth();
   const [imagePreview, setImagePreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
+  const { alertState, closeAlert, success: showSuccess, error: showError, warning: showWarning } = useAlert();
 
   const {
     register,
@@ -40,22 +42,20 @@ const LostFound = () => {
   // --- SUBMIT HANDLER ---
   const onSubmit = async (data) => {
     if (!user) {
-      alert("Please login to report an item.");
+      showWarning("Please login to report an item.");
       return;
     }
 
     try {
-      // 1. Upload Image (Optional)
       let imageUrl = null;
       if (data.image) {
         const file = data.image;
         const fileExt = file.name.split('.').pop();
-        // Path: userId/timestamp.ext
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
         const filePath = `lost-items/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('lost-items-media') // Ensure this bucket exists in Supabase
+          .from('lost-items-media')
           .upload(filePath, file);
 
         if (uploadError) throw uploadError;
@@ -67,7 +67,6 @@ const LostFound = () => {
         imageUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Insert into 'lost_items' table
       const { error: insertError } = await supabase
         .from('lost_items')
         .insert([
@@ -75,23 +74,24 @@ const LostFound = () => {
             title: data.title,
             description: data.description,
             location: data.location,
-            status: data.status,    // 'lost' or 'found' (Matches Enum)
-            reported_by: user.id,   // UUID
-            image_url: imageUrl,    // Text URL
-            
-            // claimed_by and claimed_at are null by default on creation
+            status: data.status,
+            reported_by: user.id,
+            image_url: imageUrl,
           }
         ]);
 
       if (insertError) throw insertError;
 
-      alert('Item reported successfully!');
-      reset();
-      setImagePreview(null);
+      showSuccess('Item reported successfully!', {
+        onClose: () => {
+          reset();
+          setImagePreview(null);
+        }
+      });
 
-    } catch (error) {
-      console.error('Error submitting lost & found:', error);
-      alert('Failed to submit: ' + error.message);
+    } catch (err) {
+      console.error('Error submitting lost & found:', err);
+      showError('Failed to submit: ' + err.message);
     }
   };
 
@@ -103,15 +103,15 @@ const LostFound = () => {
   const processFile = (file) => {
     if (!file) return;
 
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert('File size must be less than 50MB');
+      showWarning('File size must be less than 50MB');
       return;
     }
 
     const isImage = file.type.startsWith('image/');
     if (!isImage) {
-      alert('Please upload an image file');
+      showWarning('Please upload an image file');
       return;
     }
 
@@ -162,14 +162,14 @@ const LostFound = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F0FEFF] to-white py-8 px-4">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">Lost &amp; Found</h1>
           <p className="text-gray-500">Report an item you lost or found in the hostel</p>
         </div>
 
-        {/* Form Card */}
         <form
           onSubmit={handleSubmit(onSubmit)}
           className={`${theme.glass} rounded-2xl p-6 md:p-8 ${theme.glow}`}

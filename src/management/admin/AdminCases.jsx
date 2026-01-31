@@ -7,9 +7,11 @@ import {
 
 import { SelectBetter } from "../../UI/SelectBetter"; 
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { AlertModal } from "../../UI/Glow";
 import { fetchPendingIssues, fetchIssues, assignIssue } from "../../Services/issues.service";
 import { fetchCaretakers } from "../../Services/profile.service";
 import { useAuth } from "../../auth/AuthContext";
+import { useAlert } from "../../hooks/useAlert";
 
 const PriorityDot = ({ priority }) => {
   const colorMap = {
@@ -33,6 +35,7 @@ const AdminCases = () => {
   const [cases, setCases] = useState([]);
   const [caretakers, setCaretakers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { alertState, closeAlert, error: showError } = useAlert();
 
   // UI State
   const [activeTab, setActiveTab] = useState("pending");
@@ -115,9 +118,9 @@ const AdminCases = () => {
       ));
       setAssignModalOpen(false);
       setSelectedCase(null);
-    } catch (error) {
-      console.error("Error assigning:", error);
-      alert("Failed to assign caretaker");
+    } catch (err) {
+      console.error("Error assigning:", err);
+      showError("Failed to assign caretaker");
     }
   };
 
@@ -141,6 +144,8 @@ const AdminCases = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}

@@ -7,8 +7,10 @@ import {
 
 import { SelectBetter } from "../../UI/SelectBetter"; 
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { AlertModal } from "../../UI/Glow";
 import { fetchAssignedIssues, updateIssueStatus } from "../../Services/issues.service";
 import { useAuth } from "../../auth/AuthContext";
+import { useAlert } from "../../hooks/useAlert";
 
 const STATUS_UPDATE_OPTIONS = [
   { value: 'assigned', label: 'Assigned' },
@@ -37,6 +39,7 @@ const Assignment = () => {
   const { user } = useAuth();
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { alertState, closeAlert, success: showSuccess, error: showError } = useAlert();
 
   // UI State
   const [activeTab, setActiveTab] = useState("public");
@@ -92,9 +95,9 @@ const Assignment = () => {
       setAssignments(prev => prev.map(item => 
         item.id === id ? { ...item, status: newStatus } : item
       ));
-    } catch (error) {
-      console.error("Error updating status:", error);
-      alert("Failed to update status");
+    } catch (err) {
+      console.error("Error updating status:", err);
+      showError("Failed to update status");
     }
   };
 
@@ -104,9 +107,10 @@ const Assignment = () => {
       try {
         await updateIssueStatus(id, 'reported', user?.id, `Rejected: ${reason}`);
         setAssignments(prev => prev.filter(item => item.id !== id));
-        alert("Assignment rejected and returned to queue.");
-      } catch (error) {
-        console.error("Error rejecting:", error);
+        showSuccess("Assignment rejected and returned to queue.");
+      } catch (err) {
+        console.error("Error rejecting:", err);
+        showError("Failed to reject assignment");
       }
     }
   };
@@ -155,6 +159,8 @@ const Assignment = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}

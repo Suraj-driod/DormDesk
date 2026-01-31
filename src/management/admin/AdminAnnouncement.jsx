@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Megaphone, X, Plus, Image as ImageIcon, Trash2, CheckCircle } from 'lucide-react';
 
 import { theme } from '../../theme';
-import { Button } from '../../UI/Glow'; 
+import { Button, AlertModal } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext'; 
 import { createAnnouncement } from '../../Services/announcements.service';
 import { supabase } from '../../Lib/supabaseClient';
+import { useAlert } from '../../hooks/useAlert';
 
 const TARGET_HOSTELS = [
   { value: 'All', label: 'All Hostels' },
@@ -33,6 +34,7 @@ const AdminAnnouncement = () => {
   const [showPoll, setShowPoll] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const fileInputRef = useRef(null);
+  const { alertState, closeAlert, error: showError, warning: showWarning } = useAlert();
 
   const {
     register,
@@ -60,11 +62,10 @@ const AdminAnnouncement = () => {
   }, [register]);
 
   const onSubmit = async (data) => {
-    if (!user) return alert("Please login first.");
-    if (!isAdmin) return alert("Only admins can create announcements.");
+    if (!user) { showWarning("Please login first."); return; }
+    if (!isAdmin) { showWarning("Only admins can create announcements."); return; }
 
     try {
-      // 1. Upload Image (Optional)
       let imageUrl = null;
       if (data.image) {
         const file = data.image;
@@ -84,12 +85,11 @@ const AdminAnnouncement = () => {
         imageUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Prepare Poll JSON
       let pollDataJSON = null;
       if (showPoll) {
         const validOptions = data.pollOptions.filter(opt => opt.trim() !== '');
         if (validOptions.length < 2) {
-          alert("A poll must have at least 2 options.");
+          showWarning("A poll must have at least 2 options.");
           return;
         }
         
@@ -104,7 +104,6 @@ const AdminAnnouncement = () => {
         };
       }
 
-      // 3. Create announcement
       await createAnnouncement({
         title: data.title,
         content: data.description,
@@ -121,9 +120,9 @@ const AdminAnnouncement = () => {
       setImagePreview(null);
       setShowPoll(false);
 
-    } catch (error) {
-      console.error('Error publishing:', error);
-      alert('Failed to publish: ' + error.message);
+    } catch (err) {
+      console.error('Error publishing:', err);
+      showError('Failed to publish: ' + err.message);
     }
   };
 
@@ -134,8 +133,8 @@ const AdminAnnouncement = () => {
 
   const processFile = (file) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return alert('Max file size 5MB');
-    if (!file.type.startsWith('image/')) return alert('Images only');
+    if (file.size > 5 * 1024 * 1024) { showWarning('Max file size 5MB'); return; }
+    if (!file.type.startsWith('image/')) { showWarning('Images only'); return; }
 
     setValue('image', file);
     const reader = new FileReader();
@@ -165,6 +164,8 @@ const AdminAnnouncement = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
+      <AlertModal {...alertState} onClose={closeAlert} />
+      
       <div className="max-w-3xl mx-auto">
         
         {/* Success Toast */}

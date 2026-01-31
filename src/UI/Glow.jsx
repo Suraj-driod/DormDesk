@@ -162,6 +162,93 @@ export const Modal = ({ open, onClose, children }) => {
   )
 }
 
+/* ================= ALERT MODAL ================= */
+const ALERT_STYLES = {
+  success: {
+    border: 'border-green-200',
+    bg: 'bg-green-50',
+    iconBg: 'bg-green-100',
+    iconColor: 'text-green-600',
+    buttonBg: 'bg-green-500 hover:bg-green-600',
+    shadow: 'shadow-[0_10px_30px_rgba(34,197,94,0.25)]',
+  },
+  error: {
+    border: 'border-red-200',
+    bg: 'bg-red-50',
+    iconBg: 'bg-red-100',
+    iconColor: 'text-red-600',
+    buttonBg: 'bg-red-500 hover:bg-red-600',
+    shadow: 'shadow-[0_10px_30px_rgba(239,68,68,0.25)]',
+  },
+  warning: {
+    border: 'border-orange-200',
+    bg: 'bg-orange-50',
+    iconBg: 'bg-orange-100',
+    iconColor: 'text-orange-600',
+    buttonBg: 'bg-orange-500 hover:bg-orange-600',
+    shadow: 'shadow-[0_10px_30px_rgba(249,115,22,0.25)]',
+  },
+  info: {
+    border: 'border-blue-200',
+    bg: 'bg-blue-50',
+    iconBg: 'bg-blue-100',
+    iconColor: 'text-blue-600',
+    buttonBg: 'bg-blue-500 hover:bg-blue-600',
+    shadow: 'shadow-[0_10px_30px_rgba(59,130,246,0.25)]',
+  },
+}
+
+export const AlertModal = ({ open, onClose, title, message, type = 'info' }) => {
+  if (!open) return null
+  
+  const styles = ALERT_STYLES[type] || ALERT_STYLES.info
+
+  const icons = {
+    success: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+      </svg>
+    ),
+    error: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    ),
+    warning: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    ),
+    info: (
+      <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className={`p-6 rounded-2xl bg-white ${styles.border} border ${styles.shadow} w-full max-w-sm animate-in zoom-in-95 duration-200`}>
+        <div className="text-center">
+          <div className={`w-16 h-16 ${styles.iconBg} rounded-full flex items-center justify-center mx-auto mb-4 ${styles.iconColor}`}>
+            {icons[type]}
+          </div>
+          {title && <h3 className="text-lg font-bold text-gray-800 mb-2">{title}</h3>}
+          <p className="text-gray-600 text-sm leading-relaxed">{message}</p>
+        </div>
+        <div className="mt-5 flex justify-center">
+          <button
+            onClick={onClose}
+            className={`px-6 py-2.5 rounded-full text-white font-semibold transition-all ${styles.buttonBg}`}
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 
 
 
