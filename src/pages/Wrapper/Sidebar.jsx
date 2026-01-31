@@ -55,13 +55,7 @@ export function Sidebar({
     items.find((i) => location.pathname === i.key)?.key ||
     items[0]?.key;
 
-  const getRoleBadge = () => {
-    if (role === "admin") return { letter: "A", bg: "bg-red-500", label: "Admin" };
-    if (role === "caretaker") return { letter: "C", bg: "bg-purple-500", label: "Caretaker" };
-    return { letter: "S", bg: "bg-[#00BCD4]", label: "Student" };
-  };
 
-  const roleBadge = getRoleBadge();
 
   const SidebarContent = ({ isMobile }) => {
     const widthClass = isMobile ? "w-72" : collapsed ? "w-20" : "w-64";
@@ -76,37 +70,35 @@ export function Sidebar({
           widthClass,
         ].join(" ")}
       >
+        
         {/* Header */}
         <div className="h-14 px-3 flex items-center justify-between border-b border-[#E0E0E0]">
           <div className="flex items-center gap-3">
-            <div className={`h-9 w-9 rounded-xl ${roleBadge.bg} flex items-center justify-center text-white font-semibold shadow-lg`}>
-              {roleBadge.letter}
+            <div className="h-9 w-9 rounded-xl bg-[#E0F7FA] flex items-center justify-center text-[#00BCD4] shadow-sm">
+              <LayoutDashboard size={20} strokeWidth={2.2} />
             </div>
-            {!collapsed && !isMobile && (
-              <span className="text-sm font-semibold text-gray-700">{roleBadge.label}</span>
-            )}
-          </div>
+            
 
-          {!isMobile && (
+            {!collapsed && !isMobile && (
+              <span className="text-sm font-semibold text-gray-700">
+                Dashboard
+              </span>
+              
+            )}
+            {!isMobile && (
             <button
               onClick={onToggleCollapse}
               className="hidden md:inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[#F5F5F5] transition-colors"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2">
+              <svg width="25" height="25" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2">
                 <path d={collapsed ? "M9 18l6-6-6-6" : "M15 18l-6-6 6-6"} />
               </svg>
             </button>
           )}
-
-          {isMobile && (
-            <button
-              onClick={onClose}
-              className="h-9 w-9 rounded-lg hover:bg-[#F5F5F5] flex items-center justify-center"
-            >
-              ✕
-            </button>
-          )}
+          </div>
         </div>
+
+        
 
         {/* Navigation */}
         <nav className="p-3 space-y-1 flex-1">
