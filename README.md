@@ -1,88 +1,35 @@
 # 🏠 DormDesk
 
-> A modern, comprehensive campus management platform designed for student hostels and dormitories. Streamline issue reporting, community engagement, and campus communication all in one beautiful interface.
+> A modern campus management platform for student hostels and dormitories. Streamline issue reporting, community feed, lost & found, complaints, and announcements in one interface.
 
-![Version](https://img.shields.io/badge/version-0.0.0-blue)
-![React](https://img.shields.io/badge/React-19.2.0-61DAFB?logo=react)
-![Vite](https://img.shields.io/badge/Vite-7.2.4-646CFF?logo=vite)
-![License](https://img.shields.io/badge/license-Private-red)
+[![Version](https://img.shields.io/badge/version-0.0.0-blue)](https://github.com/Suraj-driod/DormDesk)
+[![React](https://img.shields.io/badge/React-19.2.0-61DAFB?logo=react)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-7.2.4-646CFF?logo=vite)](https://vitejs.dev/)
+[![Firebase](https://img.shields.io/badge/Firebase-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
+[![License](https://img.shields.io/badge/license-Private-red)](./README.md)
 
----
+**Repo:** [github.com/Suraj-driod/DormDesk](https://github.com/Suraj-driod/DormDesk)
 
-## 📸 Screenshots
-
-<!-- Add your project screenshots here -->
-<!-- 
-### Dashboard
-![Dashboard Screenshot](./screenshots/dashboard.png)
-
-### Issue Reporting
-![Issue Reporting Screenshot](./screenshots/issue-reporting.png)
-
-### Community Feed
-![Community Feed Screenshot](./screenshots/community-feed.png)
-
-### Lost & Found
-![Lost & Found Screenshot](./screenshots/lost-found.png)
--->
+**🎬 Hackathon presentation & videos:** [Google Drive folder](https://drive.google.com/drive/folders/1tlF3N-Vh7N6ixCUy81RHYKHczhhAJVF-?usp=sharing) — *Presentation video and materials. Use the `readme.txt` file in the folder for test login email to try out the website.*
 
 ---
 
 ## ✨ Features
 
-### 🎯 Core Functionality
+### Core
 
-- **📊 Interactive Dashboard**
-  - Auto-rotating slideshow showcasing trending issues, announcements, and updates
-  - Quick access cards for major features
-  - Real-time status indicators
+- **Dashboard** — Slideshow of trending issues, announcements; quick-access cards; status indicators
+- **Issue reporting** — Public/private issues, status flow (Reported → Assigned → In Progress → Resolved), image/video upload
+- **Community feed** — Public issues, announcements, lost items, complaints; upvote & comment; filters & real-time updates
+- **Complaints** — Against caretakers/admins/students; media proof; optional anonymous; incident date/time
+- **Lost & found** — Report lost / post found items; image upload; community-driven recovery
+- **Profile** — Personal dashboard, issue history, profile settings
+- **Auth & roles** — Login/register, session handling, Admin / User (and Caretaker) access
 
-- **📝 Issue Reporting System**
-  - Report public or private issues
-  - Track issue status (Reported → Assigned → In Progress → Resolved)
-  - Image/video upload support
-  - Detailed issue descriptions
+### Design
 
-- **📢 Community Feed**
-  - Public issues, announcements, lost items, and complaints
-  - Upvote and comment system
-  - Filtering and sorting options
-  - Real-time updates
-
-- **⚠️ Complaint Management**
-  - File complaints against caretakers, admins, or students
-  - Media proof upload (images/videos)
-  - Anonymous complaint option
-  - Incident date/time tracking
-
-- **🔍 Lost & Found**
-  - Report lost items with descriptions
-  - Found items posting
-  - Image upload for better identification
-  - Community-driven recovery
-
-- **👤 User profile**
-  - Personal dashboard
-  - Issue history tracking
-  - Profile customization
-
-- **🔐 Authentication**
-  - Secure login/registration
-  - User session management
-  - Role-based access (Admin/User)
-
-### 🎨 Design Features
-
-- **Modern UI/UX**
-  - Clean, minimalist design with cyan/blue color scheme
-  - Glassmorphism effects
-  - Smooth animations powered by Framer Motion
-  - Responsive design for all screen sizes
-
-- **Accessibility**
-  - WCAG compliant color contrasts
-  - Keyboard navigation support
-  - Screen reader friendly
+- Cyan/blue theme, glassmorphism, Framer Motion animations, responsive layout
+- WCAG contrast, keyboard nav, screen-reader friendly
 
 ---
 
@@ -90,160 +37,108 @@
 
 ### Prerequisites
 
-- **Node.js** (v18 or higher recommended)
-- **npm** or **yarn** package manager
-- **Supabase Account** (for backend services)
+- **Node.js** v18+
+- **npm** or **yarn**
+- **Firebase** project ([console](https://console.firebase.google.com/))
 
-### Installation
+### Install & run
 
-1. **Clone the repository**
+1. **Clone**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Suraj-driod/DormDesk.git
    cd DormDesk
    ```
 
-2. **Install dependencies**
+2. **Dependencies**
    ```bash
    npm install
-   # or
-   yarn install
    ```
 
-3. **Set up environment variables**
+3. **Environment**
    
-   Create a `.env` file in the root directory:
+   Copy `.env.example` to `.env` and fill in Firebase config from your project settings:
    ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   VITE_FIREBASE_API_KEY=your-firebase-api-key
+   VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your-project-id
+   VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+   VITE_FIREBASE_APP_ID=your-app-id
    ```
+   
+   Optional (for full feature set):
+   - `VITE_IMGBB_API_KEY` — image uploads via ImgBB
+   - `VITE_GEMINI_API_KEY` — similarity / OCR (e.g. lost & found)
 
-4. **Run the development server**
+4. **Dev server**
    ```bash
    npm run dev
-   # or
-   yarn dev
    ```
+   Open the URL shown (e.g. `http://localhost:5173`).
 
-5. **Open your browser**
-   
-   Navigate to `http://localhost:5173` (or the port shown in terminal)
-
-### Build for Production
+### Build & preview
 
 ```bash
-npm run build
-# or
-yarn build
-```
-
-The production build will be in the `dist` directory.
-
-### Preview Production Build
-
-```bash
-npm run preview
-# or
-yarn preview
+npm run build    # output in dist/
+npm run preview  # local preview of production build
 ```
 
 ---
 
+## 🛠 Tech stack
 
-### Key Directories Explained
-
-- **`src/components/core/`**: Reusable UI components used throughout the application
-- **`src/pages/`**: Main application pages/routes
-- **`src/pages/Wrapper/`**: Layout components (Navbar, Sidebar, Footer)
-- **`src/Lib/`**: Third-party library configurations and utilities
-- **`src/page/`**: Enhanced/specialized page components
-
----
-
-## 🛠️ Tech Stack
-
-### Frontend
-- **React 19.2.0** - UI library
-- **Vite 7.2.4** - Build tool and dev server
-- **Tailwind CSS 4.1.18** - Utility-first CSS framework
-- **Framer Motion 12.29.2** - Animation library
-- **React Hook Form 7.71.1** - Form state management
-- **Lucide React** - Icon library
-
-### Backend & Services
-- **Supabase** - Backend as a Service (BaaS)
-  - Authentication
-  - Database
-  - Storage
-
-### Development Tools
-- **ESLint** - Code linting
-- **TypeScript Types** - Type definitions for React
+| Layer | Tech |
+|-------|------|
+| **Frontend** | React 19, Vite 7, Tailwind CSS 4, Framer Motion, React Hook Form, Lucide React |
+| **Backend** | **Firebase** — Auth, Firestore, Storage |
+| **Tooling** | ESLint |
 
 ---
 
-## 🎨 Design System
+## 📁 Structure
 
-The project follows a comprehensive design system defined in `Design.json`:
+| Path | Purpose |
+|------|---------|
+| `src/components/core/` | Reusable UI (Button, Inputs, PostBase, etc.) |
+| `src/pages/` | Routes & pages; `Wrapper/` = Navbar, Sidebar, Footer |
+| `src/management/` | Admin & caretaker views (announcements, cases, lost, issues, responses) |
+| `src/auth/` | Auth context, RequireAuth / RequireAdmin / RequireCaretaker |
+| `src/services/` | Firebase/API services (issues, complaints, announcements, lost items, etc.) |
+| `src/Lib/` | Lib/config and utilities |
 
-### Color Palette
-- **Primary Cyan**: `#00D9FF`, `#00BCD4`, `#E0F7FA`, `#F0FEFF`
-- **Neutrals**: White, grays, charcoal
-- **Semantic Colors**: Success, warning, error, info
 
-### Typography
-- Primary font: System font stack (San Francisco/Roboto)
-- Scales: Hero, H1-H4, Body, Caption
 
-### Components
-- Glassmorphism cards
-- Glow effects
-- Rounded corners (26px standard)
-- Consistent spacing system
 
----
 
-## 📝 Available Scripts
+## 📜 Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-
----
-
-## 🤝 Contributing
-
-This is a private project. For contributions, please contact the project maintainers.
-
----
-
-## 📄 License
-
-This project is private and proprietary. All rights reserved.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start dev server |
+| `npm run build` | Production build |
+| `npm run preview` | Preview production build |
+| `npm run lint` | Run ESLint |
 
 ---
 
 ## 👥 Authors
 
-- Project Team
-1. Suraj Pednekar(Team Leader)
-2. Sarvesh Saste
-3. Omkar Shendge
+- **Suraj Pednekar** (Team Lead)
+- **Sarvesh Saste**
+- **Omkar Shendge**
+
+---
+
+## 📄 License
+
+Private and proprietary. All rights reserved.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- Built with [Vite](https://vitejs.dev/)
-- UI components styled with [Tailwind CSS](https://tailwindcss.com/)
-- Animations powered by [Framer Motion](https://www.framer.com/motion/)
-- Backend services by [Supabase](https://supabase.com/)
-
----
-
-## 📞 Support
-
-For support, please contact the development team or open an issue in the repository.
+- [Vite](https://vitejs.dev/) · [React](https://react.dev/) · [Tailwind CSS](https://tailwindcss.com/) · [Framer Motion](https://www.framer.com/motion/)
+- Backend: [Firebase](https://firebase.google.com/) (Auth, Firestore, Storage)
 
 ---
 
