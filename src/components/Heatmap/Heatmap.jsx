@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Wifi, Wrench, Zap, Sparkles, HelpCircle, TrendingUp } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
+import { supabase } from "../../Lib/supabaseClient";
 
 const CATEGORY_CONFIG = {
   wifi: { 
@@ -41,44 +42,71 @@ const CATEGORY_CONFIG = {
   },
 };
 
-const getDefaultStats = () =>
-  Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
-    category: key,
-    count: 0,
-    percentage: 0,
-    ...config,
-  }));
-
 const Heatmap = ({ compact = false }) => {
-  const { user, loading: authLoading, supabase } = useAuth();
-  const [categoryStats, setCategoryStats] = useState(getDefaultStats);
+  const { user, loading: authLoading } = useAuth();
+  const [categoryStats, setCategoryStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalIssues, setTotalIssues] = useState(0);
-  const mountedRef = useRef(false);
-  const fetchIdRef = useRef(0);
+  const hasFetchedRef = useRef(false);
+  const isMountedRef = useRef(true);
 
-  const fetchCategoryStats = useCallback(async () => {
-    const currentFetchId = ++fetchIdRef.current;
+  // Generate empty stats helper
+  const getEmptyStats = () =>
+    Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
+      category: key,
+      count: 0,
+      percentage: 0,
+      ...config,
+    }));
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Wait for auth to be ready
+    if (authLoading) return;
+
+    // Fetch data for any authenticated user (or when user state stabilizes)
+    // Don't clear existing data on transient auth state changes
+    if (user) {
+      fetchCategoryStats();
+      hasFetchedRef.current = true;
+    } else if (!hasFetchedRef.current) {
+      // Only show empty state if we never successfully fetched
+      setLoading(false);
+      setCategoryStats(getEmptyStats());
+    }
+  }, [authLoading, user]);
+
+  const fetchCategoryStats = async () => {
     setLoading(true);
-    
     try {
+      // Use imported supabase directly for stability
       const { data, error } = await supabase
         .from("issues")
         .select("category")
         .neq("status", "closed");
 
-      // Abort if component unmounted or a newer fetch started
-      if (!mountedRef.current || currentFetchId !== fetchIdRef.current) return;
+      if (error) {
+        console.error("Heatmap fetch error:", error);
+        throw error;
+      }
 
-      if (error) throw error;
+      if (!isMountedRef.current) return;
 
+      // Count by category
       const counts = {};
-      data.forEach((issue) => {
+      (data || []).forEach((issue) => {
         const cat = issue.category || "other";
         counts[cat] = (counts[cat] || 0) + 1;
       });
 
-      const total = data.length;
+      // Transform to array with percentages
+      const total = data?.length || 0;
       setTotalIssues(total);
 
       const stats = Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
@@ -88,40 +116,22 @@ const Heatmap = ({ compact = false }) => {
         ...config,
       }));
 
+      // Sort by count descending
       stats.sort((a, b) => b.count - a.count);
       setCategoryStats(stats);
     } catch (error) {
       console.error("Error fetching category stats:", error);
-      if (mountedRef.current && currentFetchId === fetchIdRef.current) {
-        setCategoryStats(getDefaultStats());
+      // Keep existing data if we have it, otherwise show empty
+      if (!isMountedRef.current) return;
+      if (categoryStats.length === 0) {
+        setCategoryStats(getEmptyStats());
       }
     } finally {
-      if (mountedRef.current && currentFetchId === fetchIdRef.current) {
+      if (isMountedRef.current) {
         setLoading(false);
       }
     }
-  }, [supabase]);
-
-  // Effect 1: Track mount state
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // Effect 2: Fetch on mount and when auth becomes ready
-  useEffect(() => {
-    if (authLoading) return;
-
-    if (user) {
-      fetchCategoryStats();
-    } else {
-      setCategoryStats(getDefaultStats());
-      setTotalIssues(0);
-      setLoading(false);
-    }
-  }, [authLoading, user, fetchCategoryStats]);
+  };
 
   if (loading) {
     return (

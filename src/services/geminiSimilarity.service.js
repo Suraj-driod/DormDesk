@@ -154,30 +154,49 @@ export const incrementRepostCount = async (issueId) => {
 
 /**
  * Process new issue submission with similarity check
- * @param {Object} issueData - New issue data
+ * @param {Object} issueData - New issue data (MUST include created_by)
  * @returns {Object} - Result with either new issue or merged info
  */
 export const processNewIssue = async (issueData) => {
+  // CRITICAL: Validate created_by before any DB operation
+  if (!issueData.created_by) {
+    const error = new Error("created_by is required - cannot create issue without user ID");
+    error.code = "MISSING_USER_ID";
+    console.error("processNewIssue validation failed:", error);
+    throw error;
+  }
+
   const { title, description, category } = issueData;
 
-  // Check for similar post
-  const similarPost = await detectSimilarPost(title, description, category);
+  // Try similarity check, but don't block submission if it fails
+  let similarPost = null;
+  try {
+    similarPost = await detectSimilarPost(title, description, category);
+  } catch (similarityError) {
+    console.warn("Similarity detection failed (continuing with insert):", similarityError);
+    // Continue with normal insert
+  }
 
   if (similarPost) {
     // Similar post found - increment repost count instead of creating new
-    const updatedIssue = await incrementRepostCount(similarPost.id);
+    try {
+      const updatedIssue = await incrementRepostCount(similarPost.id);
 
-    return {
-      isDuplicate: true,
-      originalIssue: updatedIssue,
-      message: `Similar issue found: "${similarPost.title}". Your report has been merged and the issue priority ${
-        updatedIssue.priorityEscalated ? "has been escalated" : "remains unchanged"
-      }. Repost count: ${updatedIssue.repost_count}`,
-      similarityReason: similarPost.similarityReason,
-    };
+      return {
+        isDuplicate: true,
+        originalIssue: updatedIssue,
+        message: `Similar issue found: "${similarPost.title}". Your report has been merged and the issue priority ${
+          updatedIssue.priorityEscalated ? "has been escalated" : "remains unchanged"
+        }. Repost count: ${updatedIssue.repost_count}`,
+        similarityReason: similarPost.similarityReason,
+      };
+    } catch (repostError) {
+      console.warn("Failed to update repost count, creating new issue instead:", repostError);
+      // Fall through to create new issue
+    }
   }
 
-  // No similar post - create new issue
+  // No similar post (or similarity check failed) - create new issue
   const { data: newIssue, error } = await supabase
     .from("issues")
     .insert({

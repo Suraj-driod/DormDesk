@@ -5,6 +5,7 @@ import { SelectBetter } from '../../UI/SelectBetter';
 import { Button, AlertModal } from '../../UI/Glow'; 
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert'; 
+import { createIssue } from '../../Services/issues.service';
 
 // 1. Categories (Matches issue_category Enum)
 const CATEGORIES = [
@@ -48,7 +49,7 @@ const ReportIssue = () => {
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
-      urgency: 'Medium', // ✅ Default must match Enum case (Capitalized)
+      urgency: 'medium', // ✅ Default must match Enum case (Capitalized)
       category: '',
       visibility: '',
       dateTime: new Date().toLocaleString('en-IN', {
@@ -78,10 +79,17 @@ const ReportIssue = () => {
 
   // --- SUBMISSION HANDLER ---
   const onSubmit = async (data) => {
-    if (!user) {
+    // GUARD: Never submit without authenticated user
+    if (!user?.id) {
+      console.error("Submit blocked: No authenticated user");
       showWarning("You must be logged in to submit an issue.");
-      return;
+      return; // Early return - do NOT proceed
     }
+
+    console.group("🟢 ReportIssue Submit");
+    console.log("Form data:", data);
+    console.log("User ID:", user.id);
+    console.groupEnd();
 
     try {
       // 1. Upload Media (if exists)
@@ -96,7 +104,10 @@ const ReportIssue = () => {
           .from('issue-media') 
           .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error("Media upload failed:", uploadError);
+          throw uploadError;
+        }
         
         const { data: publicUrlData } = supabase.storage
           .from('issue-media')
@@ -105,38 +116,49 @@ const ReportIssue = () => {
         mediaUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Insert Record into 'issues' table
-      const { error: insertError } = await supabase
-        .from('issues')
-        .insert([
-          {
-            title: data.title,
-            description: data.description,
-            category: data.category, 
-            priority: data.urgency,
-            status: 'Reported',
-            visibility: data.visibility,
-            created_by: user.id,
-            hostel: data.hostelName,
-            block: data.block,
-            room_no: data.roomNumber || null,
-            media_url: mediaUrl, 
+      // 2. Build issue payload with ALL required fields
+      const issuePayload = {
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        priority: data.urgency,
+        status: 'Reported',
+        visibility: data.visibility,
+        created_by: user.id,
+        hostel: data.hostelName,
+        block: data.block,
+        floor: data.floor || null,
+        room_no: data.roomNumber || null,
+        media_url: mediaUrl,
+      };
+
+      // 3. Create issue (similarity check disabled - can be re-enabled later)
+      const result = await createIssue(issuePayload, false);
+
+      if (result.isDuplicate) {
+        showSuccess(result.message, {
+          onClose: () => {
+            reset();
+            setMediaPreview(null);
+            setMediaType(null);
           }
-        ]);
-
-      if (insertError) throw insertError;
-
-      showSuccess("Issue submitted successfully!", { 
-        onClose: () => {
-          reset(); 
-          setMediaPreview(null);
-          setMediaType(null);
-        }
-      });
+        });
+      } else {
+        showSuccess("Issue submitted successfully!", { 
+          onClose: () => {
+            reset(); 
+            setMediaPreview(null);
+            setMediaType(null);
+          }
+        });
+      }
 
     } catch (err) {
       console.error('Error submitting issue:', err);
-      showError('Failed to submit issue: ' + err.message);
+      // Surface real Supabase error details
+      const errorMessage = err?.message || err?.details || 'Unknown error';
+      const errorCode = err?.code ? ` (${err.code})` : '';
+      showError(`Failed to submit issue: ${errorMessage}${errorCode}`);
     }
   };
 

@@ -1,7 +1,7 @@
 import { theme } from '../theme';
 
 /* ================= BUTTON ================= */
-export const Button = ({ children, className = '', ...props }) => (
+export const Button = ({ children, className = '', fullWidth, ...props }) => (
   <button
     {...props}
     className={`

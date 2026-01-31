@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { supabase } from "../Lib/supabaseClient";
+import { supabase } from "../Lib/supabaseClient.js";
 
 const AuthContext = createContext(null);
 
@@ -156,13 +156,34 @@ export const AuthProvider = ({ children }) => {
 
   // Sign Up
   const signUp = async (email, password, metadata) => {
-    return await supabase.auth.signUp({
+    const result = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: metadata,
       },
     });
+
+    // Insert into profile table after successful signup
+    if (result.data?.user && !result.error) {
+      const { error: profileError } = await supabase.from("profile").insert({
+        id: result.data.user.id,
+        name: metadata?.fullName || email.split("@")[0],
+        email: email,
+        role: metadata?.role || "student",
+        hostel: metadata?.hostel || null,
+        block: metadata?.block || null,
+        floor: metadata?.floor || null,
+        room_no: metadata?.room_no || null,
+        phone_no: metadata?.phone_no || null,
+      });
+
+      if (profileError) {
+        console.error("Error creating profile:", profileError);
+      }
+    }
+
+    return result;
   };
 
   // Logout

@@ -64,15 +64,32 @@ export const fetchIssueById = async (id) => {
   return data;
 };
 
-// Create a new issue with similarity detection
-export const createIssue = async (issueData, useSimilarityCheck = true) => {
-  if (useSimilarityCheck) {
-    // Use Gemini to check for similar issues
-    const result = await processNewIssue(issueData);
-    return result;
+// Validate required fields for issue creation
+const validateIssueData = (issueData) => {
+  const errors = [];
+  
+  if (!issueData.created_by) {
+    errors.push("created_by (user ID) is required");
   }
+  if (!issueData.title?.trim()) {
+    errors.push("title is required");
+  }
+  if (!issueData.category) {
+    errors.push("category is required");
+  }
+  
+  if (errors.length > 0) {
+    const error = new Error(`Validation failed: ${errors.join(", ")}`);
+    error.code = "VALIDATION_ERROR";
+    error.details = errors;
+    throw error;
+  }
+  
+  return true;
+};
 
-  // Direct insert without similarity check
+// Direct insert helper (no similarity check)
+const directInsertIssue = async (issueData) => {
   const { data, error } = await supabase
     .from("issues")
     .insert({
@@ -84,6 +101,22 @@ export const createIssue = async (issueData, useSimilarityCheck = true) => {
 
   if (error) throw error;
   return { isDuplicate: false, issue: data, message: "Issue reported successfully!" };
+};
+
+// Create a new issue with optional similarity detection
+export const createIssue = async (issueData, useSimilarityCheck = true) => {
+  validateIssueData(issueData);
+
+  if (!useSimilarityCheck) {
+    return directInsertIssue(issueData);
+  }
+
+  try {
+    return await processNewIssue(issueData);
+  } catch (similarityError) {
+    // Fallback to direct insert if similarity check fails
+    return directInsertIssue(issueData);
+  }
 };
 
 // Update issue status
@@ -186,6 +219,7 @@ export const fetchIssuesForFeed = async () => {
     `)
     .eq("visibility", "public")
     .order("created_at", { ascending: false });
+    console.log(data);
 
   if (error) throw error;
   return data;
