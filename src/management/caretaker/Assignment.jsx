@@ -36,7 +36,8 @@ const PriorityDot = ({ priority }) => {
 };
 
 const Assignment = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const caretakerId = profile?.managementDocId ?? profile?.id ?? user?.uid;
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const { alertState, closeAlert, success: showSuccess, error: showError } = useAlert();
@@ -51,15 +52,16 @@ const Assignment = () => {
   const [blockFilter, setBlockFilter] = useState("All");
 
   useEffect(() => {
-    if (user?.uid) {
+    if (caretakerId) {
       loadAssignments();
     }
-  }, [user]);
+  }, [caretakerId]);
 
   const loadAssignments = async () => {
+    if (!caretakerId) return;
     setLoading(true);
     try {
-      const data = await fetchAssignedIssues(user.uid);
+      const data = await fetchAssignedIssues(caretakerId);
       setAssignments(data || []);
     } catch (error) {
       console.error("Error loading assignments:", error);
@@ -122,17 +124,18 @@ const Assignment = () => {
         if (item.status !== "resolved" && item.status !== "closed") return false;
       } else {
         if (item.status === "resolved" || item.status === "closed") return false;
-        if (item.visibility !== activeTab) return false;
+        const vis = (item.visibility || "public").toString().toLowerCase();
+        if (vis !== activeTab) return false;
       }
 
-      // Search
-      const query = searchQuery.toLowerCase();
-      const matchesSearch = 
-        item.title?.toLowerCase().includes(query) ||
-        item.room_no?.toLowerCase().includes(query) ||
-        item.description?.toLowerCase().includes(query);
-
-      if (!matchesSearch) return false;
+      const query = (searchQuery || "").trim().toLowerCase();
+      if (query) {
+        const matchesSearch =
+          item.title?.toLowerCase().includes(query) ||
+          item.room_no?.toLowerCase().includes(query) ||
+          item.description?.toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
 
       // Filters
       if (categoryFilter !== "All" && item.category !== categoryFilter) return false;

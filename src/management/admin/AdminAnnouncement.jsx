@@ -7,8 +7,8 @@ import { theme } from '../../theme';
 import { Button, AlertModal } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext'; 
-import { createAnnouncement } from '../../Services/announcements.service';
-import { uploadToImgBB } from '../../Services/imgbb.service';
+import { createAnnouncement } from '../../services/announcements.service';
+import { uploadToImgBB } from '../../services/imgbb.service';
 import { useAlert } from '../../hooks/useAlert';
 
 const TARGET_HOSTELS = [

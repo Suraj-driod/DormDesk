@@ -322,14 +322,11 @@ export const fetchIssuesForFeed = async () => {
   }
 };
 
-// Fetch issues assigned to a specific caretaker
+// Fetch issues assigned to a specific caretaker (no orderBy to avoid composite index)
 export const fetchAssignedIssues = async (caretakerId) => {
+  if (!caretakerId) return [];
   const issuesRef = collection(db, ISSUES_COLLECTION);
-  const q = query(
-    issuesRef,
-    where("assigned_to", "==", caretakerId),
-    orderBy("created_at", "desc")
-  );
+  const q = query(issuesRef, where("assigned_to", "==", caretakerId));
   const snapshot = await getDocs(q);
 
   const issues = await Promise.all(snapshot.docs.map(async (docSnap) => {
@@ -346,7 +343,11 @@ export const fetchAssignedIssues = async (caretakerId) => {
     return issue;
   }));
 
-  return issues;
+  return issues.sort((a, b) => {
+    const dateA = new Date(a.created_at || 0);
+    const dateB = new Date(b.created_at || 0);
+    return dateB - dateA;
+  });
 };
 
 // Get issue statistics for dashboard
