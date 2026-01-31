@@ -15,6 +15,7 @@ import AdminAnnouncement from './management/admin/AdminAnnouncement';
 import AdminLost from './management/admin/AdminLost';
 import AdminCases from './management/admin/AdminCases';
 import AppLayout from './layouts/AppLayout';
+import { RequireAuth } from './auth/RequireAuth';
 
 function App() {
   return (
@@ -25,7 +26,7 @@ function App() {
         <Route path="/register" element={<Register />} />
 
         {/* Protected routes - with AppLayout */}
-        <Route element={<AppLayout />}>
+        <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/feed" element={<Feed />} />
           <Route path="/issues" element={<Issues />} />
