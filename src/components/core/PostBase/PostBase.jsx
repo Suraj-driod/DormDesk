@@ -26,7 +26,9 @@ const PostBase = ({
   isUpvoted = false,
   onUpvote,
   onCommentClick,
+  onPostClick,
   onRepost,
+  mediaFullSize = false,
   
   // Slots for extensibility
   headerSlot,
@@ -212,6 +214,22 @@ const PostBase = ({
     </svg>
   );
 
+  const clickable = Boolean(onPostClick);
+  const wrap = (children) =>
+    clickable ? (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onPostClick}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onPostClick?.()}
+        className="cursor-pointer outline-none"
+      >
+        {children}
+      </div>
+    ) : (
+      children
+    );
+
   return (
     <article
       className={`
@@ -221,6 +239,8 @@ const PostBase = ({
         ${className}
       `}
     >
+      {wrap(
+        <>
       {/* Header */}
       <header className="px-4 pt-4 pb-3 border-b border-gray-50">
         <div className="flex items-start justify-between gap-3">
@@ -304,6 +324,8 @@ const PostBase = ({
           {/* Custom media via slot */}
           {media.type === 'custom' && media.render && media.render()}
         </div>
+      )}
+        </>
       )}
 
       {/* Custom footer slot (above actions) */}

@@ -4,9 +4,7 @@ import {
   getDoc, 
   getDocs, 
   addDoc, 
-  deleteDoc, 
-  query, 
-  where 
+  deleteDoc 
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 
@@ -18,16 +16,15 @@ export const addUpvote = async (issueId) => {
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
 
-    // Check if user already voted
+    // Check if user already voted - fetch all votes for issue, filter client-side
     const votesRef = collection(db, VOTES_COLLECTION);
-    const existingVoteQ = query(
-      votesRef,
-      where("issue_id", "==", issueId),
-      where("user_id", "==", user.uid)
-    );
-    const existingSnap = await getDocs(existingVoteQ);
+    const snapshot = await getDocs(votesRef);
+    const existingVote = snapshot.docs.find(doc => {
+      const data = doc.data();
+      return data.issue_id === issueId && data.user_id === user.uid;
+    });
     
-    if (!existingSnap.empty) {
+    if (existingVote) {
       throw new Error("Already voted");
     }
 
@@ -51,19 +48,18 @@ export const removeUpvote = async (issueId) => {
     const user = auth.currentUser;
     if (!user) throw new Error("User not authenticated");
 
+    // Fetch all votes, filter client-side to avoid composite index
     const votesRef = collection(db, VOTES_COLLECTION);
-    const q = query(
-      votesRef,
-      where("issue_id", "==", issueId),
-      where("user_id", "==", user.uid)
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(votesRef);
+    const voteDoc = snapshot.docs.find(doc => {
+      const data = doc.data();
+      return data.issue_id === issueId && data.user_id === user.uid;
+    });
 
-    if (snapshot.empty) throw new Error("No vote found");
+    if (!voteDoc) throw new Error("No vote found");
 
-    const voteDoc = snapshot.docs[0];
     const voteData = { id: voteDoc.id, ...voteDoc.data() };
-    await deleteDoc(voteDoc.ref);
+    await deleteDoc(doc(db, VOTES_COLLECTION, voteDoc.id));
     
     return voteData;
   } catch (error) {
@@ -89,15 +85,15 @@ export const getUpvoteCount = async (issueId) => {
 // Check if user has voted on an issue
 export const hasUserVoted = async (issueId, userId) => {
   try {
+    // Fetch all votes, filter client-side to avoid composite index
     const votesRef = collection(db, VOTES_COLLECTION);
-    const q = query(
-      votesRef,
-      where("issue_id", "==", issueId),
-      where("user_id", "==", userId)
-    );
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocs(votesRef);
+    const hasVoted = snapshot.docs.some(doc => {
+      const data = doc.data();
+      return data.issue_id === issueId && data.user_id === userId;
+    });
 
-    return !snapshot.empty;
+    return hasVoted;
   } catch (error) {
     console.error("Error checking vote:", error);
     return false;

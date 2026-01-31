@@ -104,6 +104,12 @@ export const fetchIssueById = async (id) => {
     if (!issueSnap.exists()) throw new Error("Issue not found");
 
     const issue = { id: issueSnap.id, ...issueSnap.data() };
+    // Normalize media: support media_url (single) or media (array)
+    if (issue.media_url) {
+      issue.media = Array.isArray(issue.media) ? issue.media : [issue.media_url];
+    } else if (!issue.media || !Array.isArray(issue.media)) {
+      issue.media = issue.media ? [issue.media] : [];
+    }
 
     // Fetch creator profile
     if (issue.created_by) {
@@ -123,27 +129,10 @@ export const fetchIssueById = async (id) => {
       }
     }
 
-    // Get upvotes
     const upvotesRef = collection(db, "votes");
     const upvotesQ = query(upvotesRef, where("issue_id", "==", id));
     const upvotesSnap = await getDocs(upvotesQ);
     issue.upvotes = [{ count: upvotesSnap.size }];
-
-    // Get comments
-    const commentsRef = collection(db, "comments");
-    const commentsQ = query(commentsRef, where("issue_id", "==", id), orderBy("created_at", "desc"));
-    const commentsSnap = await getDocs(commentsQ);
-    issue.comments = await Promise.all(commentsSnap.docs.map(async (commentDoc) => {
-      const comment = { id: commentDoc.id, ...commentDoc.data() };
-      if (comment.user_id) {
-        const userRef = doc(db, "users", comment.user_id);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          comment.user = { id: userSnap.id, ...userSnap.data() };
-        }
-      }
-      return comment;
-    }));
 
     return issue;
   } catch (error) {
@@ -278,8 +267,14 @@ export const fetchIssuesForFeed = async () => {
     // Fetch all issues, filter client-side to avoid composite index requirement
     const snapshot = await getDocs(issuesRef);
 
+    console.log("Total issues in DB:", snapshot.docs.length);
+
     const issues = await Promise.all(snapshot.docs
-      .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+      .map(docSnap => {
+        const data = { id: docSnap.id, ...docSnap.data() };
+        console.log("Issue data:", data.id, "media_url:", data.media_url);
+        return data;
+      })
       .filter(issue => issue.visibility === "public")
       .map(async (issue) => {
         // Fetch creator name

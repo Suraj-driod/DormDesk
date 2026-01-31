@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Search, Lock, Globe, FileText, Loader2 } from "lucide-react"; 
 import { PostBase } from "../../components/core";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
@@ -18,7 +19,7 @@ const FILTER_OPTIONS = [
 ];
 
 const Issues = () => {
-  // 1. Fetch Real Data
+  const navigate = useNavigate();
   const { reports, loading } = useMyReports();
   
   const [activeTab, setActiveTab] = useState("public"); // 'public' | 'private'
@@ -129,12 +130,13 @@ const Issues = () => {
                       author={issue.author}
                       timestamp={issue.timestamp}
                       content={issue.content}
-                      visibility={issue.type} // 'public' or 'private'
+                      visibility={issue.type}
                       media={issue.media}
                       upvoteCount={issue.upvotes}
                       commentCount={issue.comments}
+                      onCommentClick={() => navigate(`/feed/post/${issue.id}`)}
+                      onPostClick={() => navigate(`/feed/post/${issue.id}`)}
                       currentStatus={<BadgeBetter1 status={issue.status} />}
-                      // Simple timeline logic based on status
                       statusTimeline={[
                         { label: "Reported", timestamp: "Created", active: true },
                         { label: issue.status, timestamp: "Current", active: true },

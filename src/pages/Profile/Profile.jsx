@@ -10,6 +10,27 @@ import { useAuth } from "../../auth/AuthContext";
 import { fetchUserProfile, updateUserProfile } from "../../Services/profile.service";
 import { useAlert } from "../../hooks/useAlert";
 
+const ProfileField = ({ icon: Icon, label, value, editable, fieldKey, editValue, onEditChange }) => (
+  <div className="flex items-center gap-4 p-4 bg-white/50 border border-[#E6FBFF] rounded-2xl hover:border-[#00E5FF]/50 transition-colors group">
+    <div className="w-10 h-10 rounded-full bg-[#E0F7FA] flex items-center justify-center text-[#00B8D4] group-hover:bg-[#00E5FF] group-hover:text-white transition-colors shadow-sm">
+      <Icon size={18} strokeWidth={2.5} />
+    </div>
+    <div className="flex-1">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
+      {editable ? (
+        <input
+          type="text"
+          value={editValue ?? ''}
+          onChange={(e) => onEditChange?.(e.target.value)}
+          className="w-full text-sm font-medium text-gray-800 border-b border-gray-300 focus:border-[#00E5FF] outline-none py-1 bg-transparent"
+        />
+      ) : (
+        <p className="text-sm font-medium text-gray-800">{value || "-"}</p>
+      )}
+    </div>
+  </div>
+);
+
 const Profile = () => {
   const { user, profile: authProfile, logout, refreshProfile, isAdmin, isCaretaker, isStudent } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
@@ -26,15 +47,18 @@ const Profile = () => {
   const loadProfile = async () => {
     try {
       const userId = user.uid || user.id;
-      let data = await fetchUserProfile(userId);
+      const userEmail = user.email;
+      
+      // Pass both userId and email for proper management/users lookup
+      let data = await fetchUserProfile(userId, userEmail);
       
       // Fallback to auth profile if Firestore profile doesn't exist
       if (!data && authProfile) {
         data = {
           ...authProfile,
           id: userId,
-          email: user.email,
-          name: authProfile.name || user.displayName || user.email?.split("@")[0],
+          email: userEmail,
+          name: authProfile.name || user.displayName || userEmail?.split("@")[0],
         };
       }
       
@@ -42,8 +66,8 @@ const Profile = () => {
       if (!data) {
         data = {
           id: userId,
-          email: user.email,
-          name: user.displayName || user.email?.split("@")[0],
+          email: userEmail,
+          name: user.displayName || userEmail?.split("@")[0],
           role: "student",
         };
       }
@@ -74,7 +98,9 @@ const Profile = () => {
   const handleSave = async () => {
     try {
       const userId = user.uid || user.id;
-      await updateUserProfile(userId, editForm, profile?.role);
+      const userEmail = user.email;
+      // Pass email for management users (document ID = email)
+      await updateUserProfile(userId, editForm, profile?.role, userEmail);
       await loadProfile();
       await refreshProfile();
       setIsEditing(false);
@@ -118,27 +144,6 @@ const Profile = () => {
   };
 
   const roleTheme = getRoleTheme();
-
-  const ProfileField = ({ icon: Icon, label, value, editable, fieldKey }) => (
-    <div className="flex items-center gap-4 p-4 bg-white/50 border border-[#E6FBFF] rounded-2xl hover:border-[#00E5FF]/50 transition-colors group">
-      <div className="w-10 h-10 rounded-full bg-[#E0F7FA] flex items-center justify-center text-[#00B8D4] group-hover:bg-[#00E5FF] group-hover:text-white transition-colors shadow-sm">
-        <Icon size={18} strokeWidth={2.5} />
-      </div>
-      <div className="flex-1">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{label}</p>
-        {isEditing && editable ? (
-          <input
-            type="text"
-            value={editForm[fieldKey] || ''}
-            onChange={(e) => setEditForm({ ...editForm, [fieldKey]: e.target.value })}
-            className="w-full text-sm font-medium text-gray-800 border-b border-gray-300 focus:border-[#00E5FF] outline-none py-1 bg-transparent"
-          />
-        ) : (
-          <p className="text-sm font-medium text-gray-800">{value || "-"}</p>
-        )}
-      </div>
-    </div>
-  );
 
   const StatCard = ({ label, count, color, icon: Icon }) => (
     <div className="flex-1 bg-white/60 backdrop-blur border border-[#E6FBFF] p-4 rounded-2xl text-center shadow-sm relative overflow-hidden">
@@ -285,7 +290,15 @@ const Profile = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                 <ProfileField icon={Mail} label="Email Address" value={profile.email} />
-                <ProfileField icon={Phone} label="Phone Number" value={profile.phone} editable fieldKey="phone" />
+                <ProfileField
+                  icon={Phone}
+                  label="Phone Number"
+                  value={profile.phone}
+                  editable={isEditing}
+                  fieldKey="phone"
+                  editValue={editForm.phone}
+                  onEditChange={(val) => setEditForm((prev) => ({ ...prev, phone: val }))}
+                />
               </div>
 
               {(isStudent || isCaretaker) && (
@@ -296,16 +309,26 @@ const Profile = () => {
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <ProfileField 
-                      icon={Building} 
-                      label={isCaretaker ? "Hostel Block" : "Hostel Name"} 
-                      value={profile.hostel || profile.hostel_block} 
-                      editable={isStudent}
+                    <ProfileField
+                      icon={Building}
+                      label={isCaretaker ? "Hostel Block" : "Hostel Name"}
+                      value={profile.hostel || profile.hostel_block}
+                      editable={isStudent && isEditing}
                       fieldKey="hostel"
+                      editValue={editForm.hostel}
+                      onEditChange={(val) => setEditForm((prev) => ({ ...prev, hostel: val }))}
                     />
                     {isStudent && (
                       <>
-                        <ProfileField icon={MapPin} label="Block & Room" value={`${profile.block}, Room ${profile.room_no}`} editable fieldKey="block" />
+                        <ProfileField
+                          icon={MapPin}
+                          label="Block & Room"
+                          value={(`${profile.block || ''}, Room ${profile.room_no || ''}`).trim() || '-'}
+                          editable={isEditing}
+                          fieldKey="block"
+                          editValue={editForm.block}
+                          onEditChange={(val) => setEditForm((prev) => ({ ...prev, block: val }))}
+                        />
                         <ProfileField icon={Shield} label="Floor" value={profile.floor} />
                       </>
                     )}

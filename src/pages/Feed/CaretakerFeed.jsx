@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import {
   Megaphone,
   Users,
@@ -31,6 +32,7 @@ const TABS = [
 ];
 
 const CaretakerFeed = () => {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState("issues");
   const [sortOrder, setSortOrder] = useState("newest");
@@ -97,6 +99,7 @@ const CaretakerFeed = () => {
                   visibility: issue.visibility,
                   category: issue.category,
                   priority: issue.priority,
+                  media: issue.media_url ? { type: "image", url: issue.media_url } : null,
                 };
               })
           );
@@ -315,8 +318,11 @@ const CaretakerFeed = () => {
                     timestamp={post.timestamp}
                     content={post.content}
                     visibility={post.visibility}
+                    media={post.media}
                     upvoteCount={post.upvotes}
                     commentCount={post.comments}
+                    onCommentClick={activeTab === "issues" ? () => navigate(`/feed/post/${post.id}`) : undefined}
+                    onPostClick={activeTab === "issues" ? () => navigate(`/feed/post/${post.id}`) : undefined}
                     currentStatus={<BadgeBetter1 status={post.status} />}
                     statusTimeline={[
                       {
