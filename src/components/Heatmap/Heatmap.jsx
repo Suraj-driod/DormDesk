@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Wifi, Wrench, Zap, Sparkles, HelpCircle, TrendingUp } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
@@ -41,48 +41,43 @@ const CATEGORY_CONFIG = {
   },
 };
 
+const getDefaultStats = () =>
+  Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
+    category: key,
+    count: 0,
+    percentage: 0,
+    ...config,
+  }));
+
 const Heatmap = ({ compact = false }) => {
   const { user, loading: authLoading, supabase } = useAuth();
-  const [categoryStats, setCategoryStats] = useState([]);
+  const [categoryStats, setCategoryStats] = useState(getDefaultStats);
   const [loading, setLoading] = useState(true);
   const [totalIssues, setTotalIssues] = useState(0);
+  const mountedRef = useRef(false);
+  const fetchIdRef = useRef(0);
 
-  useEffect(() => {
-    // Only fetch when auth is ready and user exists
-    if (!authLoading && user) {
-      fetchCategoryStats();
-    } else if (!authLoading && !user) {
-      // No user, show empty state
-      setLoading(false);
-      setCategoryStats(
-        Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
-          category: key,
-          count: 0,
-          percentage: 0,
-          ...config,
-        }))
-      );
-    }
-  }, [authLoading, user]);
-
-  const fetchCategoryStats = async () => {
+  const fetchCategoryStats = useCallback(async () => {
+    const currentFetchId = ++fetchIdRef.current;
     setLoading(true);
+    
     try {
       const { data, error } = await supabase
         .from("issues")
         .select("category")
         .neq("status", "closed");
 
+      // Abort if component unmounted or a newer fetch started
+      if (!mountedRef.current || currentFetchId !== fetchIdRef.current) return;
+
       if (error) throw error;
 
-      // Count by category
       const counts = {};
       data.forEach((issue) => {
         const cat = issue.category || "other";
         counts[cat] = (counts[cat] || 0) + 1;
       });
 
-      // Transform to array with percentages
       const total = data.length;
       setTotalIssues(total);
 
@@ -93,24 +88,40 @@ const Heatmap = ({ compact = false }) => {
         ...config,
       }));
 
-      // Sort by count descending
       stats.sort((a, b) => b.count - a.count);
       setCategoryStats(stats);
     } catch (error) {
       console.error("Error fetching category stats:", error);
-      // Fallback to empty stats
-      setCategoryStats(
-        Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
-          category: key,
-          count: 0,
-          percentage: 0,
-          ...config,
-        }))
-      );
+      if (mountedRef.current && currentFetchId === fetchIdRef.current) {
+        setCategoryStats(getDefaultStats());
+      }
     } finally {
+      if (mountedRef.current && currentFetchId === fetchIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [supabase]);
+
+  // Effect 1: Track mount state
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Effect 2: Fetch on mount and when auth becomes ready
+  useEffect(() => {
+    if (authLoading) return;
+
+    if (user) {
+      fetchCategoryStats();
+    } else {
+      setCategoryStats(getDefaultStats());
+      setTotalIssues(0);
       setLoading(false);
     }
-  };
+  }, [authLoading, user, fetchCategoryStats]);
 
   if (loading) {
     return (
