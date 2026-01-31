@@ -5,6 +5,8 @@ import { Button, AlertModal } from '../../UI/Glow';
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert';
+import { createLostItem } from '../../Services/lostItems.service';
+import { uploadToImgBB } from '../../Services/imgbb.service';
 
 // Enum values match your DB: {lost, found, claimed}
 const STATUS_OPTIONS = [
@@ -13,7 +15,7 @@ const STATUS_OPTIONS = [
 ];
 
 const LostFound = () => {
-  const { user, supabase } = useAuth();
+  const { user } = useAuth();
   const [imagePreview, setImagePreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -47,40 +49,23 @@ const LostFound = () => {
     }
 
     try {
+      // Upload image to ImgBB if exists
       let imageUrl = null;
-      if (data.image) {
-        const file = data.image;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        const filePath = `lost-items/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('lost-items-media')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('lost-items-media')
-          .getPublicUrl(filePath);
-          
-        imageUrl = publicUrlData.publicUrl;
+      if (data.image && data.image.type?.startsWith('image/')) {
+        try {
+          imageUrl = await uploadToImgBB(data.image);
+        } catch (uploadError) {
+          console.warn("Image upload failed:", uploadError);
+        }
       }
 
-      const { error: insertError } = await supabase
-        .from('lost_items')
-        .insert([
-          {
-            title: data.title,
-            description: data.description,
-            location: data.location,
-            status: data.status,
-            reported_by: user.id,
-            image_url: imageUrl,
-          }
-        ]);
-
-      if (insertError) throw insertError;
+      await createLostItem({
+        title: data.title,
+        description: data.description,
+        location: data.location,
+        status: data.status,
+        image_url: imageUrl,
+      }, user.uid);
 
       showSuccess('Item reported successfully!', {
         onClose: () => {
@@ -103,9 +88,9 @@ const LostFound = () => {
   const processFile = (file) => {
     if (!file) return;
 
-    const maxSize = 50 * 1024 * 1024;
+    const maxSize = 32 * 1024 * 1024; // 32MB for ImgBB
     if (file.size > maxSize) {
-      showWarning('File size must be less than 50MB');
+      showWarning('File size must be less than 32MB');
       return;
     }
 
@@ -296,7 +281,7 @@ const LostFound = () => {
                   <span className="text-sm text-gray-600">
                     <span className="text-[#00E5FF] font-semibold">Click to upload</span> or drag and drop
                   </span>
-                  <span className="text-xs text-gray-400">Images up to 50MB</span>
+                  <span className="text-xs text-gray-400">Images up to 32MB</span>
                 </div>
               )}
             </div>

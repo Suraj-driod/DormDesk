@@ -1,146 +1,264 @@
-import { supabase } from "../Lib/supabaseClient";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy 
+} from "firebase/firestore";
+import { db } from "../firebase";
+
+const COMPLAINTS_COLLECTION = "complaints";
 
 // Fetch all complaints
 export const fetchComplaints = async (filters = {}) => {
-  let query = supabase
-    .from("complaints")
-    .select(`
-      *,
-      raised_by_profile:raised_by (id, name, hostel, block, room_no),
-      accused_profile:accused_user_id (id, name)
-    `)
-    .order("created_at", { ascending: false });
+  try {
+    const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
+    // Fetch all, filter client-side to avoid composite index requirement
+    const snapshot = await getDocs(complaintsRef);
 
-  // Apply filters
-  if (filters.status) {
-    query = query.eq("status", filters.status);
-  }
-  if (filters.complaint_type) {
-    query = query.eq("complaint_type", filters.complaint_type);
-  }
-  if (filters.raised_by) {
-    query = query.eq("raised_by", filters.raised_by);
-  }
+    let complaints = await Promise.all(snapshot.docs.map(async (docSnap) => {
+      const complaint = { id: docSnap.id, ...docSnap.data() };
 
-  const { data, error } = await query;
+      // Fetch raised_by profile
+      if (complaint.raised_by) {
+        try {
+          const profileRef = doc(db, "users", complaint.raised_by);
+          const profileSnap = await getDoc(profileRef);
+          if (profileSnap.exists()) {
+            complaint.raised_by_profile = { id: profileSnap.id, ...profileSnap.data() };
+          }
+        } catch (e) {
+          console.warn("Could not fetch raiser profile:", e);
+        }
+      }
 
-  if (error) throw error;
-  return data;
+      // Fetch accused profile if it's a user ID
+      if (complaint.accused_user_id) {
+        try {
+          const accusedRef = doc(db, "users", complaint.accused_user_id);
+          const accusedSnap = await getDoc(accusedRef);
+          if (accusedSnap.exists()) {
+            complaint.accused_profile = { id: accusedSnap.id, ...accusedSnap.data() };
+          }
+        } catch (e) {
+          console.warn("Could not fetch accused profile:", e);
+        }
+      }
+
+      return complaint;
+    }));
+
+    // Apply filters client-side
+    if (filters.status) {
+      complaints = complaints.filter(c => c.status === filters.status);
+    }
+    if (filters.complaint_type) {
+      complaints = complaints.filter(c => c.complaint_type === filters.complaint_type);
+    }
+    if (filters.raised_by) {
+      complaints = complaints.filter(c => c.raised_by === filters.raised_by);
+    }
+
+    // Sort by created_at descending
+    return complaints.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB - dateA;
+    });
+  } catch (error) {
+    console.error("Error fetching complaints:", error);
+    return [];
+  }
 };
 
 // Fetch single complaint by id
 export const fetchComplaintById = async (id) => {
-  const { data, error } = await supabase
-    .from("complaints")
-    .select(`
-      *,
-      raised_by_profile:raised_by (id, name, email, hostel, block, room_no),
-      accused_profile:accused_user_id (id, name, email)
-    `)
-    .eq("id", id)
-    .single();
+  try {
+    const complaintRef = doc(db, COMPLAINTS_COLLECTION, id);
+    const complaintSnap = await getDoc(complaintRef);
 
-  if (error) throw error;
-  return data;
+    if (!complaintSnap.exists()) throw new Error("Complaint not found");
+
+    const complaint = { id: complaintSnap.id, ...complaintSnap.data() };
+
+    // Fetch profiles
+    if (complaint.raised_by) {
+      const profileRef = doc(db, "users", complaint.raised_by);
+      const profileSnap = await getDoc(profileRef);
+      if (profileSnap.exists()) {
+        complaint.raised_by_profile = { id: profileSnap.id, ...profileSnap.data() };
+      }
+    }
+
+    if (complaint.accused_user_id) {
+      const accusedRef = doc(db, "users", complaint.accused_user_id);
+      const accusedSnap = await getDoc(accusedRef);
+      if (accusedSnap.exists()) {
+        complaint.accused_profile = { id: accusedSnap.id, ...accusedSnap.data() };
+      }
+    }
+
+    return complaint;
+  } catch (error) {
+    console.error("Error fetching complaint:", error);
+    throw error;
+  }
 };
 
 // Create a new complaint
 export const createComplaint = async (complaintData, userId) => {
-  const { data, error } = await supabase
-    .from("complaints")
-    .insert({
+  try {
+    const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
+    const docRef = await addDoc(complaintsRef, {
       ...complaintData,
       raised_by: userId,
       status: "submitted",
-    })
-    .select()
-    .single();
+      created_at: new Date().toISOString(),
+    });
 
-  if (error) throw error;
-  return data;
+    const newSnap = await getDoc(docRef);
+    return { id: newSnap.id, ...newSnap.data() };
+  } catch (error) {
+    console.error("Error creating complaint:", error);
+    throw error;
+  }
 };
 
 // Update complaint status (Admin only)
 export const updateComplaintStatus = async (id, status, closedAt = null) => {
-  const updateData = { status };
-  
-  if (status === "closed") {
-    updateData.closed_at = closedAt || new Date().toISOString();
+  try {
+    const complaintRef = doc(db, COMPLAINTS_COLLECTION, id);
+    const updateData = { status };
+    
+    if (status === "closed") {
+      updateData.closed_at = closedAt || new Date().toISOString();
+    }
+
+    await updateDoc(complaintRef, updateData);
+
+    const updatedSnap = await getDoc(complaintRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
+  } catch (error) {
+    console.error("Error updating complaint status:", error);
+    throw error;
   }
-
-  const { data, error } = await supabase
-    .from("complaints")
-    .update(updateData)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
 };
 
 // Delete a complaint
 export const deleteComplaint = async (id) => {
-  const { data, error } = await supabase
-    .from("complaints")
-    .delete()
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  try {
+    const complaintRef = doc(db, COMPLAINTS_COLLECTION, id);
+    const complaintSnap = await getDoc(complaintRef);
+    
+    if (!complaintSnap.exists()) throw new Error("Complaint not found");
+    
+    const complaintData = { id: complaintSnap.id, ...complaintSnap.data() };
+    await deleteDoc(complaintRef);
+    return complaintData;
+  } catch (error) {
+    console.error("Error deleting complaint:", error);
+    throw error;
+  }
 };
 
 // Fetch complaints by user
 export const fetchUserComplaints = async (userId) => {
-  const { data, error } = await supabase
-    .from("complaints")
-    .select(`
-      *,
-      accused_profile:accused_user_id (id, name)
-    `)
-    .eq("raised_by", userId)
-    .order("created_at", { ascending: false });
+  try {
+    const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
+    const q = query(
+      complaintsRef,
+      where("raised_by", "==", userId),
+      orderBy("created_at", "desc")
+    );
+    const snapshot = await getDocs(q);
 
-  if (error) throw error;
-  return data;
+    const complaints = await Promise.all(snapshot.docs.map(async (docSnap) => {
+      const complaint = { id: docSnap.id, ...docSnap.data() };
+
+      if (complaint.accused_user_id) {
+        const accusedRef = doc(db, "users", complaint.accused_user_id);
+        const accusedSnap = await getDoc(accusedRef);
+        if (accusedSnap.exists()) {
+          complaint.accused_profile = { id: accusedSnap.id, ...accusedSnap.data() };
+        }
+      }
+
+      return complaint;
+    }));
+
+    return complaints;
+  } catch (error) {
+    console.error("Error fetching user complaints:", error);
+    throw error;
+  }
 };
 
 // Get complaint statistics
 export const getComplaintStats = async () => {
-  const { data, error } = await supabase
-    .from("complaints")
-    .select("status, complaint_type");
+  try {
+    const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
+    const snapshot = await getDocs(complaintsRef);
 
-  if (error) throw error;
+    const stats = {
+      total: snapshot.size,
+      byStatus: {},
+      byType: {},
+    };
 
-  const stats = {
-    total: data.length,
-    byStatus: {},
-    byType: {},
-  };
+    snapshot.docs.forEach((docSnap) => {
+      const complaint = docSnap.data();
+      stats.byStatus[complaint.status] = (stats.byStatus[complaint.status] || 0) + 1;
+      stats.byType[complaint.complaint_type] = (stats.byType[complaint.complaint_type] || 0) + 1;
+    });
 
-  data.forEach((complaint) => {
-    stats.byStatus[complaint.status] = (stats.byStatus[complaint.status] || 0) + 1;
-    stats.byType[complaint.complaint_type] = (stats.byType[complaint.complaint_type] || 0) + 1;
-  });
-
-  return stats;
+    return stats;
+  } catch (error) {
+    console.error("Error getting complaint stats:", error);
+    throw error;
+  }
 };
 
 // Fetch pending complaints for admin
 export const fetchPendingComplaints = async () => {
-  const { data, error } = await supabase
-    .from("complaints")
-    .select(`
-      *,
-      raised_by_profile:raised_by (id, name, hostel),
-      accused_profile:accused_user_id (id, name)
-    `)
-    .in("status", ["submitted", "under_review"])
-    .order("created_at", { ascending: true });
+  try {
+    const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
+    const q = query(
+      complaintsRef,
+      where("status", "in", ["submitted", "under_review"]),
+      orderBy("created_at", "asc")
+    );
+    const snapshot = await getDocs(q);
 
-  if (error) throw error;
-  return data;
+    const complaints = await Promise.all(snapshot.docs.map(async (docSnap) => {
+      const complaint = { id: docSnap.id, ...docSnap.data() };
+
+      if (complaint.raised_by) {
+        const profileRef = doc(db, "users", complaint.raised_by);
+        const profileSnap = await getDoc(profileRef);
+        if (profileSnap.exists()) {
+          complaint.raised_by_profile = { id: profileSnap.id, ...profileSnap.data() };
+        }
+      }
+
+      if (complaint.accused_user_id) {
+        const accusedRef = doc(db, "users", complaint.accused_user_id);
+        const accusedSnap = await getDoc(accusedRef);
+        if (accusedSnap.exists()) {
+          complaint.accused_profile = { id: accusedSnap.id, ...accusedSnap.data() };
+        }
+      }
+
+      return complaint;
+    }));
+
+    return complaints;
+  } catch (error) {
+    console.error("Error fetching pending complaints:", error);
+    throw error;
+  }
 };

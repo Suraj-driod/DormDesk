@@ -1,182 +1,280 @@
-import { supabase } from "../Lib/supabaseClient";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy 
+} from "firebase/firestore";
+import { db } from "../firebase";
+
+const LOST_ITEMS_COLLECTION = "lost_found";
 
 // Fetch all lost items
 export const fetchLostItems = async (filters = {}) => {
-  let query = supabase
-    .from("lost_items")
-    .select(`
-      *,
-      reported_by_profile:reported_by (id, name, hostel, block),
-      claimed_by_profile:claimed_by (id, name)
-    `)
-    .order("created_at", { ascending: false });
+  try {
+    const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
+    // Fetch all, filter client-side to avoid composite index requirement
+    const snapshot = await getDocs(lostItemsRef);
 
-  // Apply filters
-  if (filters.status) {
-    query = query.eq("status", filters.status);
+    let items = await Promise.all(snapshot.docs.map(async (docSnap) => {
+      const item = { id: docSnap.id, ...docSnap.data() };
+
+      // Fetch reported_by profile
+      if (item.reported_by) {
+        try {
+          const profileRef = doc(db, "users", item.reported_by);
+          const profileSnap = await getDoc(profileRef);
+          if (profileSnap.exists()) {
+            item.reported_by_profile = { id: profileSnap.id, ...profileSnap.data() };
+          }
+        } catch (e) {
+          console.warn("Could not fetch reporter profile:", e);
+        }
+      }
+
+      // Fetch claimed_by profile
+      if (item.claimed_by) {
+        try {
+          const claimedRef = doc(db, "users", item.claimed_by);
+          const claimedSnap = await getDoc(claimedRef);
+          if (claimedSnap.exists()) {
+            item.claimed_by_profile = { id: claimedSnap.id, ...claimedSnap.data() };
+          }
+        } catch (e) {
+          console.warn("Could not fetch claimer profile:", e);
+        }
+      }
+
+      return item;
+    }));
+
+    // Apply status filter client-side
+    if (filters.status) {
+      items = items.filter(item => item.status === filters.status);
+    }
+
+    // Apply location filter client-side (case-insensitive search)
+    if (filters.location) {
+      const locationLower = filters.location.toLowerCase();
+      items = items.filter(item => 
+        item.location?.toLowerCase().includes(locationLower)
+      );
+    }
+
+    // Sort by created_at descending
+    return items.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB - dateA;
+    });
+  } catch (error) {
+    console.error("Error fetching lost items:", error);
+    throw error;
   }
-  if (filters.location) {
-    query = query.ilike("location", `%${filters.location}%`);
-  }
-
-  const { data, error } = await query;
-
-  if (error) throw error;
-  return data;
 };
 
 // Fetch single lost item by id
 export const fetchLostItemById = async (id) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .select(`
-      *,
-      reported_by_profile:reported_by (id, name, email, hostel, block, room_no),
-      claimed_by_profile:claimed_by (id, name, email)
-    `)
-    .eq("id", id)
-    .single();
+  try {
+    const itemRef = doc(db, LOST_ITEMS_COLLECTION, id);
+    const itemSnap = await getDoc(itemRef);
 
-  if (error) throw error;
-  return data;
+    if (!itemSnap.exists()) throw new Error("Item not found");
+
+    const item = { id: itemSnap.id, ...itemSnap.data() };
+
+    // Fetch profiles
+    if (item.reported_by) {
+      const profileRef = doc(db, "users", item.reported_by);
+      const profileSnap = await getDoc(profileRef);
+      if (profileSnap.exists()) {
+        item.reported_by_profile = { id: profileSnap.id, ...profileSnap.data() };
+      }
+    }
+
+    if (item.claimed_by) {
+      const claimedRef = doc(db, "users", item.claimed_by);
+      const claimedSnap = await getDoc(claimedRef);
+      if (claimedSnap.exists()) {
+        item.claimed_by_profile = { id: claimedSnap.id, ...claimedSnap.data() };
+      }
+    }
+
+    return item;
+  } catch (error) {
+    console.error("Error fetching lost item:", error);
+    throw error;
+  }
 };
 
 // Create a new lost item entry
 export const createLostItem = async (itemData, userId) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .insert({
+  try {
+    const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
+    const docRef = await addDoc(lostItemsRef, {
       ...itemData,
       reported_by: userId,
       status: itemData.status || "lost",
-    })
-    .select()
-    .single();
+      created_at: new Date().toISOString(),
+    });
 
-  if (error) throw error;
-  return data;
+    const newSnap = await getDoc(docRef);
+    return { id: newSnap.id, ...newSnap.data() };
+  } catch (error) {
+    console.error("Error creating lost item:", error);
+    throw error;
+  }
 };
 
 // Update lost item status
 export const updateLostItemStatus = async (id, status) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .update({ status })
-    .eq("id", id)
-    .select()
-    .single();
+  try {
+    const itemRef = doc(db, LOST_ITEMS_COLLECTION, id);
+    await updateDoc(itemRef, { status });
 
-  if (error) throw error;
-  return data;
+    const updatedSnap = await getDoc(itemRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
+  } catch (error) {
+    console.error("Error updating lost item status:", error);
+    throw error;
+  }
 };
 
 // Mark item as claimed
 export const markItemClaimed = async (id, claimedById) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .update({
+  try {
+    const itemRef = doc(db, LOST_ITEMS_COLLECTION, id);
+    await updateDoc(itemRef, {
       status: "claimed",
       claimed_by: claimedById,
       claimed_at: new Date().toISOString(),
-    })
-    .eq("id", id)
-    .select()
-    .single();
+    });
 
-  if (error) throw error;
-  return data;
+    const updatedSnap = await getDoc(itemRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
+  } catch (error) {
+    console.error("Error marking item claimed:", error);
+    throw error;
+  }
 };
 
 // Mark item as found
 export const markItemFound = async (id) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .update({ status: "found" })
-    .eq("id", id)
-    .select()
-    .single();
+  try {
+    const itemRef = doc(db, LOST_ITEMS_COLLECTION, id);
+    await updateDoc(itemRef, { status: "found" });
 
-  if (error) throw error;
-  return data;
+    const updatedSnap = await getDoc(itemRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
+  } catch (error) {
+    console.error("Error marking item found:", error);
+    throw error;
+  }
 };
 
 // Delete a lost item entry
 export const deleteLostItem = async (id) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .delete()
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  try {
+    const itemRef = doc(db, LOST_ITEMS_COLLECTION, id);
+    const itemSnap = await getDoc(itemRef);
+    
+    if (!itemSnap.exists()) throw new Error("Item not found");
+    
+    const itemData = { id: itemSnap.id, ...itemSnap.data() };
+    await deleteDoc(itemRef);
+    return itemData;
+  } catch (error) {
+    console.error("Error deleting lost item:", error);
+    throw error;
+  }
 };
 
 // Fetch lost items by user
 export const fetchUserLostItems = async (userId) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .select("*")
-    .eq("reported_by", userId)
-    .order("created_at", { ascending: false });
+  try {
+    const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
+    const q = query(
+      lostItemsRef,
+      where("reported_by", "==", userId),
+      orderBy("created_at", "desc")
+    );
+    const snapshot = await getDocs(q);
 
-  if (error) throw error;
-  return data;
+    return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+  } catch (error) {
+    console.error("Error fetching user lost items:", error);
+    throw error;
+  }
 };
 
 // Search lost items
 export const searchLostItems = async (searchQuery) => {
-  const { data, error } = await supabase
-    .from("lost_items")
-    .select(`
-      *,
-      reported_by_profile:reported_by (name)
-    `)
-    .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%,location.ilike.%${searchQuery}%`)
-    .neq("status", "claimed")
-    .order("created_at", { ascending: false });
+  try {
+    const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
+    const q = query(lostItemsRef, orderBy("created_at", "desc"));
+    const snapshot = await getDocs(q);
 
-  if (error) throw error;
-  return data;
+    const searchLower = searchQuery.toLowerCase();
+    
+    let items = await Promise.all(snapshot.docs.map(async (docSnap) => {
+      const item = docSnap.data();
+      
+      // Filter by search query (client-side)
+      const titleMatch = item.title?.toLowerCase().includes(searchLower);
+      const descMatch = item.description?.toLowerCase().includes(searchLower);
+      const locationMatch = item.location?.toLowerCase().includes(searchLower);
+      
+      if (!titleMatch && !descMatch && !locationMatch) return null;
+      if (item.status === "claimed") return null;
+
+      const result = { id: docSnap.id, ...item };
+
+      if (item.reported_by) {
+        const profileRef = doc(db, "users", item.reported_by);
+        const profileSnap = await getDoc(profileRef);
+        if (profileSnap.exists()) {
+          result.reported_by_profile = { name: profileSnap.data().name };
+        }
+      }
+
+      return result;
+    }));
+
+    return items.filter(Boolean);
+  } catch (error) {
+    console.error("Error searching lost items:", error);
+    throw error;
+  }
 };
 
 // Get lost items statistics
 export const getLostItemStats = async () => {
-  const { data, error } = await supabase.from("lost_items").select("status");
+  try {
+    const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
+    const snapshot = await getDocs(lostItemsRef);
 
-  if (error) throw error;
+    const stats = {
+      total: snapshot.size,
+      lost: 0,
+      found: 0,
+      claimed: 0,
+    };
 
-  const stats = {
-    total: data.length,
-    lost: 0,
-    found: 0,
-    claimed: 0,
-  };
+    snapshot.docs.forEach((docSnap) => {
+      const status = docSnap.data().status;
+      if (stats[status] !== undefined) {
+        stats[status]++;
+      }
+    });
 
-  data.forEach((item) => {
-    if (stats[item.status] !== undefined) {
-      stats[item.status]++;
-    }
-  });
-
-  return stats;
-};
-
-// Upload lost item image
-export const uploadLostItemImage = async (file, userId) => {
-  const fileExt = file.name.split(".").pop();
-  const fileName = `lost-items/${Date.now()}_${userId}.${fileExt}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("lost-items-media")
-    .upload(fileName, file);
-
-  if (uploadError) throw uploadError;
-
-  const { data: publicUrlData } = supabase.storage
-    .from("lost-items-media")
-    .getPublicUrl(fileName);
-
-  return publicUrlData.publicUrl;
+    return stats;
+  } catch (error) {
+    console.error("Error getting lost item stats:", error);
+    throw error;
+  }
 };

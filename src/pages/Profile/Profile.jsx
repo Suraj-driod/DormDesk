@@ -6,7 +6,6 @@ import {
 } from "lucide-react";
 import { theme } from "../../theme";
 import { Button, AlertModal } from "../../UI/Glow";
-import { NotFound } from "../../UI/Glow";
 import { useAuth } from "../../auth/AuthContext";
 import { fetchUserProfile, updateUserProfile } from "../../Services/profile.service";
 import { useAlert } from "../../hooks/useAlert";
@@ -26,7 +25,29 @@ const Profile = () => {
 
   const loadProfile = async () => {
     try {
-      const data = await fetchUserProfile(user.id);
+      const userId = user.uid || user.id;
+      let data = await fetchUserProfile(userId);
+      
+      // Fallback to auth profile if Firestore profile doesn't exist
+      if (!data && authProfile) {
+        data = {
+          ...authProfile,
+          id: userId,
+          email: user.email,
+          name: authProfile.name || user.displayName || user.email?.split("@")[0],
+        };
+      }
+      
+      // Final fallback to basic user info
+      if (!data) {
+        data = {
+          id: userId,
+          email: user.email,
+          name: user.displayName || user.email?.split("@")[0],
+          role: "student",
+        };
+      }
+      
       setProfile(data);
       setEditForm({
         phone: data?.phone || '',
@@ -36,6 +57,15 @@ const Profile = () => {
       });
     } catch (error) {
       console.error("Error loading profile:", error);
+      // Use auth profile as fallback on error
+      if (authProfile || user) {
+        setProfile({
+          id: user.uid || user.id,
+          email: user.email,
+          name: authProfile?.name || user.displayName || user.email?.split("@")[0],
+          role: authProfile?.role || "student",
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -43,7 +73,8 @@ const Profile = () => {
 
   const handleSave = async () => {
     try {
-      await updateUserProfile(user.id, editForm, profile?.role);
+      const userId = user.uid || user.id;
+      await updateUserProfile(userId, editForm, profile?.role);
       await loadProfile();
       await refreshProfile();
       setIsEditing(false);
@@ -62,10 +93,18 @@ const Profile = () => {
   }
 
   if (!profile && !loading) {
+    // This shouldn't happen with fallbacks, but just in case
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] px-4">
-        <div className="w-full max-w-lg">
-          <NotFound />
+        <div className="text-center">
+          <h2 className="text-xl font-bold text-gray-700 mb-2">Profile Loading Issue</h2>
+          <p className="text-gray-500 mb-4">Unable to load your profile. Please try again.</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-6 py-2 bg-[#00B8D4] text-white rounded-full font-medium"
+          >
+            Refresh Page
+          </button>
         </div>
       </div>
     );

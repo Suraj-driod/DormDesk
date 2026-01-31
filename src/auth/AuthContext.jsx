@@ -1,5 +1,13 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { supabase } from "../Lib/supabaseClient.js";
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut,
+  updateProfile 
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { auth, db } from "../firebase";
 
 const AuthContext = createContext(null);
 
@@ -8,25 +16,23 @@ const AUTH_TIMEOUT_MS = 5000;
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const isMountedRef = useRef(true);
 
-  // Fetch user profile from profile or management table
+  // Fetch user profile from users or management collection
   const fetchProfile = useCallback(async (userId) => {
     if (!userId) return null;
 
     try {
-      // First check management table (admin/caretaker)
-      const { data: mgmtData, error: mgmtError } = await supabase
-        .from("management")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      // First check management collection (admin/caretaker)
+      const mgmtRef = doc(db, "management", userId);
+      const mgmtSnap = await getDoc(mgmtRef);
 
-      if (mgmtData && !mgmtError) {
+      if (mgmtSnap.exists()) {
+        const mgmtData = mgmtSnap.data();
         return {
+          id: userId,
           ...mgmtData,
           role: mgmtData.role,
           name: mgmtData.full_name,
@@ -34,31 +40,27 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      // Fallback to profile table (student)
-      const { data: profileData, error: profileError } = await supabase
-        .from("profile")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      // Fallback to users collection (student)
+      const userRef = doc(db, "users", userId);
+      const userSnap = await getDoc(userRef);
 
-      if (profileData && !profileError) {
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
         return {
-          ...profileData,
-          role: profileData.role || "student",
+          id: userId,
+          ...userData,
+          role: userData.role || "student",
         };
       }
 
-      // If no profile exists, use auth metadata
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser?.user_metadata) {
+      // If no profile exists, use auth user info
+      const currentUser = auth.currentUser;
+      if (currentUser) {
         return {
           id: userId,
-          name: authUser.user_metadata.fullName || authUser.email?.split("@")[0],
-          email: authUser.email,
-          role: authUser.user_metadata.role || "student",
-          hostel: authUser.user_metadata.hostel,
-          block: authUser.user_metadata.block,
-          room_no: authUser.user_metadata.room_no,
+          name: currentUser.displayName || currentUser.email?.split("@")[0],
+          email: currentUser.email,
+          role: "student",
         };
       }
 
@@ -88,108 +90,92 @@ export const AuthProvider = ({ children }) => {
       completeInit();
     }, AUTH_TIMEOUT_MS);
 
-    // Set up auth state listener FIRST (before getSession)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        console.log("Auth event:", event);
-        if (!isMountedRef.current) return;
+    // Set up auth state listener
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!isMountedRef.current) return;
 
-        // Handle session update
-        setSession(currentSession);
-        setUser(currentSession?.user || null);
+      setUser(currentUser);
 
-        if (currentSession?.user) {
-          const userProfile = await fetchProfile(currentSession.user.id);
-          if (isMountedRef.current) setProfile(userProfile);
-        } else {
-          setProfile(null);
-        }
-
-        // Complete initialization on any auth event
-        completeInit();
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(async ({ data: { session: existingSession }, error }) => {
-      if (error) console.error("getSession error:", error);
-      if (!isMountedRef.current || initialized) return;
-
-      setSession(existingSession);
-      setUser(existingSession?.user || null);
-
-      if (existingSession?.user) {
-        const userProfile = await fetchProfile(existingSession.user.id);
+      if (currentUser) {
+        const userProfile = await fetchProfile(currentUser.uid);
         if (isMountedRef.current) setProfile(userProfile);
+      } else {
+        setProfile(null);
       }
 
-      completeInit();
-    }).catch((err) => {
-      console.error("Session check failed:", err);
       completeInit();
     });
 
     return () => {
       isMountedRef.current = false;
       clearTimeout(timeoutId);
-      subscription.unsubscribe();
+      unsubscribe();
     };
   }, [fetchProfile]);
 
   // Refresh profile data
   const refreshProfile = useCallback(async () => {
-    if (user?.id) {
-      const userProfile = await fetchProfile(user.id);
+    if (user?.uid) {
+      const userProfile = await fetchProfile(user.uid);
       setProfile(userProfile);
     }
   }, [user, fetchProfile]);
 
   // Login
   const login = async (email, password) => {
-    const result = await supabase.auth.signInWithPassword({ email, password });
-    if (result.data?.user) {
-      const userProfile = await fetchProfile(result.data.user.id);
-      setProfile(userProfile);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      if (result.user) {
+        const userProfile = await fetchProfile(result.user.uid);
+        setProfile(userProfile);
+      }
+      return { data: result, error: null };
+    } catch (error) {
+      console.error("Login error:", error);
+      return { data: null, error };
     }
-    return result;
   };
 
   // Sign Up
   const signUp = async (email, password, metadata) => {
-    const result = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: metadata,
-      },
-    });
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      
+      if (result.user) {
+        // Update display name
+        await updateProfile(result.user, {
+          displayName: metadata?.fullName || email.split("@")[0],
+        });
 
-    // Insert into profile table after successful signup
-    if (result.data?.user && !result.error) {
-      const { error: profileError } = await supabase.from("profile").insert({
-        id: result.data.user.id,
-        name: metadata?.fullName || email.split("@")[0],
-        email: email,
-        role: metadata?.role || "student",
-        hostel: metadata?.hostel || null,
-        block: metadata?.block || null,
-        floor: metadata?.floor || null,
-        room_no: metadata?.room_no || null,
-        phone_no: metadata?.phone_no || null,
-      });
+        // Create user document in Firestore
+        const userRef = doc(db, "users", result.user.uid);
+        await setDoc(userRef, {
+          name: metadata?.fullName || email.split("@")[0],
+          email: email,
+          role: metadata?.role || "student",
+          hostel: metadata?.hostel || null,
+          block: metadata?.block || null,
+          floor: metadata?.floor || null,
+          room_no: metadata?.room_no || null,
+          phone_no: metadata?.phone_no || null,
+          created_at: new Date().toISOString(),
+        });
 
-      if (profileError) {
-        console.error("Error creating profile:", profileError);
+        const userProfile = await fetchProfile(result.user.uid);
+        setProfile(userProfile);
       }
-    }
 
-    return result;
+      return { data: result, error: null };
+    } catch (error) {
+      console.error("Signup error:", error);
+      return { data: null, error };
+    }
   };
 
   // Logout
   const logout = async () => {
     setProfile(null);
-    return await supabase.auth.signOut();
+    return await signOut(auth);
   };
 
   // Role check helpers
@@ -201,14 +187,12 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider
       value={{
         user,
-        session,
         profile,
         loading,
         login,
         signUp,
         logout,
         refreshProfile,
-        supabase,
         // Role helpers
         isAdmin,
         isCaretaker,

@@ -1,82 +1,163 @@
-import { supabase } from "../Lib/supabaseClient";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit,
+  serverTimestamp 
+} from "firebase/firestore";
+import { db } from "../firebase";
 import { processNewIssue } from "./geminiSimilarity.service";
 
-// Fetch all issues
+const ISSUES_COLLECTION = "issues";
+
+// Fetch all issues with optional filters
 export const fetchIssues = async (filters = {}) => {
-  let query = supabase
-    .from("issues")
-    .select(`
-      *,
-      profile:created_by (id, name, hostel, block, room_no),
-      assigned_profile:assigned_to (id, name),
-      upvotes:issue_upvotes (count),
-      comments:issue_comments (count)
-    `)
-    .order("created_at", { ascending: false });
+  try {
+    const issuesRef = collection(db, ISSUES_COLLECTION);
+    // Fetch all, filter client-side to avoid composite index requirement
+    const snapshot = await getDocs(issuesRef);
 
-  // Apply filters
-  if (filters.status) {
-    query = query.eq("status", filters.status);
-  }
-  if (filters.category) {
-    query = query.eq("category", filters.category);
-  }
-  if (filters.visibility) {
-    query = query.eq("visibility", filters.visibility);
-  }
-  if (filters.hostel) {
-    query = query.eq("hostel", filters.hostel);
-  }
-  if (filters.priority) {
-    query = query.eq("priority", filters.priority);
-  }
-  if (filters.created_by) {
-    query = query.eq("created_by", filters.created_by);
-  }
-  if (filters.assigned_to) {
-    query = query.eq("assigned_to", filters.assigned_to);
-  }
+    let issues = await Promise.all(snapshot.docs.map(async (docSnap) => {
+      const issue = { id: docSnap.id, ...docSnap.data() };
+      
+      // Fetch creator profile
+      if (issue.created_by) {
+        try {
+          const profileRef = doc(db, "users", issue.created_by);
+          const profileSnap = await getDoc(profileRef);
+          if (profileSnap.exists()) {
+            issue.profile = { id: profileSnap.id, ...profileSnap.data() };
+          }
+        } catch (e) {
+          console.warn("Could not fetch creator profile:", e);
+        }
+      }
+      
+      // Fetch assigned profile
+      if (issue.assigned_to) {
+        try {
+          const assignedRef = doc(db, "management", issue.assigned_to);
+          const assignedSnap = await getDoc(assignedRef);
+          if (assignedSnap.exists()) {
+            issue.assigned_profile = { id: assignedSnap.id, ...assignedSnap.data() };
+          }
+        } catch (e) {
+          console.warn("Could not fetch assigned profile:", e);
+        }
+      }
 
-  const { data, error } = await query;
+      // Get upvotes count
+      try {
+        const upvotesQ = query(collection(db, "votes"), where("issue_id", "==", docSnap.id));
+        const upvotesSnap = await getDocs(upvotesQ);
+        issue.upvotes = [{ count: upvotesSnap.size }];
+      } catch (e) {
+        issue.upvotes = [{ count: 0 }];
+      }
 
-  if (error) throw error;
-  return data;
+      // Get comments count
+      try {
+        const commentsQ = query(collection(db, "comments"), where("issue_id", "==", docSnap.id));
+        const commentsSnap = await getDocs(commentsQ);
+        issue.comments = [{ count: commentsSnap.size }];
+      } catch (e) {
+        issue.comments = [{ count: 0 }];
+      }
+
+      return issue;
+    }));
+
+    // Apply filters client-side
+    if (filters.status) issues = issues.filter(i => i.status === filters.status);
+    if (filters.category) issues = issues.filter(i => i.category === filters.category);
+    if (filters.visibility) issues = issues.filter(i => i.visibility === filters.visibility);
+    if (filters.hostel) issues = issues.filter(i => i.hostel === filters.hostel);
+    if (filters.priority) issues = issues.filter(i => i.priority === filters.priority);
+    if (filters.created_by) issues = issues.filter(i => i.created_by === filters.created_by);
+    if (filters.assigned_to) issues = issues.filter(i => i.assigned_to === filters.assigned_to);
+
+    // Sort by created_at descending
+    return issues.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB - dateA;
+    });
+  } catch (error) {
+    console.error("Error fetching issues:", error);
+    return [];
+  }
 };
 
 // Fetch single issue by id
 export const fetchIssueById = async (id) => {
-  const { data, error } = await supabase
-    .from("issues")
-    .select(`
-      *,
-      profile:created_by (id, name, email, hostel, block, room_no),
-      assigned_profile:assigned_to (id, name, email),
-      upvotes:issue_upvotes (count),
-      comments:issue_comments (
-        id, content, created_at,
-        user:user_id (id, name)
-      )
-    `)
-    .eq("id", id)
-    .single();
+  try {
+    const issueRef = doc(db, ISSUES_COLLECTION, id);
+    const issueSnap = await getDoc(issueRef);
 
-  if (error) throw error;
-  return data;
+    if (!issueSnap.exists()) throw new Error("Issue not found");
+
+    const issue = { id: issueSnap.id, ...issueSnap.data() };
+
+    // Fetch creator profile
+    if (issue.created_by) {
+      const profileRef = doc(db, "users", issue.created_by);
+      const profileSnap = await getDoc(profileRef);
+      if (profileSnap.exists()) {
+        issue.profile = { id: profileSnap.id, ...profileSnap.data() };
+      }
+    }
+
+    // Fetch assigned profile
+    if (issue.assigned_to) {
+      const assignedRef = doc(db, "management", issue.assigned_to);
+      const assignedSnap = await getDoc(assignedRef);
+      if (assignedSnap.exists()) {
+        issue.assigned_profile = { id: assignedSnap.id, ...assignedSnap.data() };
+      }
+    }
+
+    // Get upvotes
+    const upvotesRef = collection(db, "votes");
+    const upvotesQ = query(upvotesRef, where("issue_id", "==", id));
+    const upvotesSnap = await getDocs(upvotesQ);
+    issue.upvotes = [{ count: upvotesSnap.size }];
+
+    // Get comments
+    const commentsRef = collection(db, "comments");
+    const commentsQ = query(commentsRef, where("issue_id", "==", id), orderBy("created_at", "desc"));
+    const commentsSnap = await getDocs(commentsQ);
+    issue.comments = await Promise.all(commentsSnap.docs.map(async (commentDoc) => {
+      const comment = { id: commentDoc.id, ...commentDoc.data() };
+      if (comment.user_id) {
+        const userRef = doc(db, "users", comment.user_id);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          comment.user = { id: userSnap.id, ...userSnap.data() };
+        }
+      }
+      return comment;
+    }));
+
+    return issue;
+  } catch (error) {
+    console.error("Error fetching issue:", error);
+    throw error;
+  }
 };
 
-// Validate required fields for issue creation
+// Validate required fields
 const validateIssueData = (issueData) => {
   const errors = [];
-  
-  if (!issueData.created_by) {
-    errors.push("created_by (user ID) is required");
-  }
-  if (!issueData.title?.trim()) {
-    errors.push("title is required");
-  }
-  if (!issueData.category) {
-    errors.push("category is required");
-  }
+  if (!issueData.created_by) errors.push("created_by (user ID) is required");
+  if (!issueData.title?.trim()) errors.push("title is required");
+  if (!issueData.category) errors.push("category is required");
   
   if (errors.length > 0) {
     const error = new Error(`Validation failed: ${errors.join(", ")}`);
@@ -84,23 +165,20 @@ const validateIssueData = (issueData) => {
     error.details = errors;
     throw error;
   }
-  
   return true;
 };
 
-// Direct insert helper (no similarity check)
+// Direct insert helper
 const directInsertIssue = async (issueData) => {
-  const { data, error } = await supabase
-    .from("issues")
-    .insert({
-      ...issueData,
-      repost_count: 0,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return { isDuplicate: false, issue: data, message: "Issue reported successfully!" };
+  const issuesRef = collection(db, ISSUES_COLLECTION);
+  const docRef = await addDoc(issuesRef, {
+    ...issueData,
+    repost_count: 0,
+    created_at: new Date().toISOString(),
+  });
+  
+  const newDoc = await getDoc(docRef);
+  return { isDuplicate: false, issue: { id: newDoc.id, ...newDoc.data() }, message: "Issue reported successfully!" };
 };
 
 // Create a new issue with optional similarity detection
@@ -114,146 +192,183 @@ export const createIssue = async (issueData, useSimilarityCheck = true) => {
   try {
     return await processNewIssue(issueData);
   } catch (similarityError) {
-    // Fallback to direct insert if similarity check fails
     return directInsertIssue(issueData);
   }
 };
 
 // Update issue status
 export const updateIssueStatus = async (id, status, changedBy, note = null) => {
-  // Get current status for logging
-  const { data: currentIssue } = await supabase
-    .from("issues")
-    .select("status")
-    .eq("id", id)
-    .single();
-
-  // Update the issue
+  const issueRef = doc(db, ISSUES_COLLECTION, id);
+  const issueSnap = await getDoc(issueRef);
+  
+  if (!issueSnap.exists()) throw new Error("Issue not found");
+  
+  const currentIssue = issueSnap.data();
   const updateData = { status };
+  
   if (status === "resolved") {
     updateData.resolved_at = new Date().toISOString();
   }
 
-  const { data, error } = await supabase
-    .from("issues")
-    .update(updateData)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
+  await updateDoc(issueRef, updateData);
 
   // Log status change
-  await supabase.from("issue_status_logs").insert({
+  const logsRef = collection(db, "issue_status_logs");
+  await addDoc(logsRef, {
     issue_id: id,
-    old_status: currentIssue?.status,
+    old_status: currentIssue.status,
     new_status: status,
     changed_by: changedBy,
     note,
+    changed_at: new Date().toISOString(),
   });
 
-  return data;
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
 };
 
 // Assign issue to caretaker
 export const assignIssue = async (issueId, caretakerId, assignedBy) => {
-  const { data, error } = await supabase
-    .from("issues")
-    .update({
-      assigned_to: caretakerId,
-      status: "assigned",
-    })
-    .eq("id", issueId)
-    .select()
-    .single();
-
-  if (error) throw error;
+  const issueRef = doc(db, ISSUES_COLLECTION, issueId);
+  
+  await updateDoc(issueRef, {
+    assigned_to: caretakerId,
+    status: "assigned",
+  });
 
   // Log the assignment
-  await supabase.from("issue_status_logs").insert({
+  const logsRef = collection(db, "issue_status_logs");
+  await addDoc(logsRef, {
     issue_id: issueId,
     old_status: "reported",
     new_status: "assigned",
     changed_by: assignedBy,
-    note: `Assigned to caretaker`,
+    note: "Assigned to caretaker",
+    changed_at: new Date().toISOString(),
   });
 
-  return data;
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
 };
 
 // Update issue priority
 export const updateIssuePriority = async (id, priority) => {
-  const { data, error } = await supabase
-    .from("issues")
-    .update({ priority })
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  const issueRef = doc(db, ISSUES_COLLECTION, id);
+  await updateDoc(issueRef, { priority });
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
 };
 
 // Delete an issue
 export const deleteIssue = async (id) => {
-  const { data, error } = await supabase
-    .from("issues")
-    .delete()
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  const issueRef = doc(db, ISSUES_COLLECTION, id);
+  const issueSnap = await getDoc(issueRef);
+  
+  if (!issueSnap.exists()) throw new Error("Issue not found");
+  
+  const issueData = { id: issueSnap.id, ...issueSnap.data() };
+  await deleteDoc(issueRef);
+  return issueData;
 };
 
 // Fetch issues for public feed
 export const fetchIssuesForFeed = async () => {
-  const { data, error } = await supabase
-    .from("issues")
-    .select(`
-      id, title, description, created_at, status, visibility, category, priority, repost_count,
-      profile:created_by (name),
-      upvotes:issue_upvotes (count),
-      comments:issue_comments (count)
-    `)
-    .eq("visibility", "public")
-    .order("created_at", { ascending: false });
-    console.log(data);
+  try {
+    const issuesRef = collection(db, ISSUES_COLLECTION);
+    // Fetch all issues, filter client-side to avoid composite index requirement
+    const snapshot = await getDocs(issuesRef);
 
-  if (error) throw error;
-  return data;
+    const issues = await Promise.all(snapshot.docs
+      .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+      .filter(issue => issue.visibility === "public")
+      .map(async (issue) => {
+        // Fetch creator name
+        if (issue.created_by) {
+          try {
+            const profileRef = doc(db, "users", issue.created_by);
+            const profileSnap = await getDoc(profileRef);
+            if (profileSnap.exists()) {
+              issue.profile = { name: profileSnap.data().name };
+            }
+          } catch (e) {
+            console.warn("Could not fetch profile:", e);
+          }
+        }
+
+        // Get upvotes count
+        try {
+          const upvotesQ = query(collection(db, "votes"), where("issue_id", "==", issue.id));
+          const upvotesSnap = await getDocs(upvotesQ);
+          issue.upvotes = [{ count: upvotesSnap.size }];
+        } catch (e) {
+          issue.upvotes = [{ count: 0 }];
+        }
+
+        // Get comments count
+        try {
+          const commentsQ = query(collection(db, "comments"), where("issue_id", "==", issue.id));
+          const commentsSnap = await getDocs(commentsQ);
+          issue.comments = [{ count: commentsSnap.size }];
+        } catch (e) {
+          issue.comments = [{ count: 0 }];
+        }
+
+        return issue;
+      }));
+
+    // Sort by created_at descending (client-side)
+    return issues.sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB - dateA;
+    });
+  } catch (error) {
+    console.error("Error fetching issues for feed:", error);
+    return [];
+  }
 };
 
 // Fetch issues assigned to a specific caretaker
 export const fetchAssignedIssues = async (caretakerId) => {
-  const { data, error } = await supabase
-    .from("issues")
-    .select(`
-      *,
-      profile:created_by (id, name, hostel, block, room_no)
-    `)
-    .eq("assigned_to", caretakerId)
-    .order("created_at", { ascending: false });
+  const issuesRef = collection(db, ISSUES_COLLECTION);
+  const q = query(
+    issuesRef,
+    where("assigned_to", "==", caretakerId),
+    orderBy("created_at", "desc")
+  );
+  const snapshot = await getDocs(q);
 
-  if (error) throw error;
-  return data;
+  const issues = await Promise.all(snapshot.docs.map(async (docSnap) => {
+    const issue = { id: docSnap.id, ...docSnap.data() };
+    
+    if (issue.created_by) {
+      const profileRef = doc(db, "users", issue.created_by);
+      const profileSnap = await getDoc(profileRef);
+      if (profileSnap.exists()) {
+        issue.profile = { id: profileSnap.id, ...profileSnap.data() };
+      }
+    }
+    
+    return issue;
+  }));
+
+  return issues;
 };
 
 // Get issue statistics for dashboard
 export const getIssueStats = async () => {
-  const { data, error } = await supabase.from("issues").select("status, category, priority");
-
-  if (error) throw error;
+  const issuesRef = collection(db, ISSUES_COLLECTION);
+  const snapshot = await getDocs(issuesRef);
 
   const stats = {
-    total: data.length,
+    total: snapshot.size,
     byStatus: {},
     byCategory: {},
     byPriority: {},
   };
 
-  data.forEach((issue) => {
+  snapshot.docs.forEach((docSnap) => {
+    const issue = docSnap.data();
     stats.byStatus[issue.status] = (stats.byStatus[issue.status] || 0) + 1;
     stats.byCategory[issue.category] = (stats.byCategory[issue.category] || 0) + 1;
     stats.byPriority[issue.priority] = (stats.byPriority[issue.priority] || 0) + 1;
@@ -264,17 +379,32 @@ export const getIssueStats = async () => {
 
 // Get pending issues (not assigned)
 export const fetchPendingIssues = async () => {
-  const { data, error } = await supabase
-    .from("issues")
-    .select(`
-      *,
-      profile:created_by (id, name, hostel, block, room_no)
-    `)
-    .is("assigned_to", null)
-    .eq("status", "reported")
-    .order("priority", { ascending: false })
-    .order("created_at", { ascending: true });
+  const issuesRef = collection(db, ISSUES_COLLECTION);
+  const q = query(
+    issuesRef,
+    where("status", "==", "reported"),
+    orderBy("created_at", "asc")
+  );
+  const snapshot = await getDocs(q);
 
-  if (error) throw error;
-  return data;
+  const issues = await Promise.all(snapshot.docs.map(async (docSnap) => {
+    const issue = docSnap.data();
+    
+    // Filter out assigned issues (Firestore doesn't support "is null" easily)
+    if (issue.assigned_to) return null;
+
+    const result = { id: docSnap.id, ...issue };
+    
+    if (issue.created_by) {
+      const profileRef = doc(db, "users", issue.created_by);
+      const profileSnap = await getDoc(profileRef);
+      if (profileSnap.exists()) {
+        result.profile = { id: profileSnap.id, ...profileSnap.data() };
+      }
+    }
+    
+    return result;
+  }));
+
+  return issues.filter(Boolean);
 };

@@ -8,7 +8,7 @@ import { Button, AlertModal } from '../../UI/Glow';
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext'; 
 import { createAnnouncement } from '../../Services/announcements.service';
-import { supabase } from '../../Lib/supabaseClient';
+import { uploadToImgBB } from '../../Services/imgbb.service';
 import { useAlert } from '../../hooks/useAlert';
 
 const TARGET_HOSTELS = [
@@ -66,23 +66,14 @@ const AdminAnnouncement = () => {
     if (!isAdmin) { showWarning("Only admins can create announcements."); return; }
 
     try {
+      // Upload image to ImgBB if exists
       let imageUrl = null;
-      if (data.image) {
-        const file = data.image;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `announcements/${Date.now()}_${user.id}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('announcements-media') 
-          .upload(fileName, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('announcements-media')
-          .getPublicUrl(fileName);
-          
-        imageUrl = publicUrlData.publicUrl;
+      if (data.image && data.image.type?.startsWith('image/')) {
+        try {
+          imageUrl = await uploadToImgBB(data.image);
+        } catch (uploadError) {
+          console.warn("Image upload failed:", uploadError);
+        }
       }
 
       let pollDataJSON = null;
@@ -111,7 +102,7 @@ const AdminAnnouncement = () => {
         target_block: data.targetBlock,
         image_url: imageUrl,
         poll_data: pollDataJSON,
-      }, user.id);
+      }, user.uid);
 
       setSubmitSuccess(true);
       setTimeout(() => setSubmitSuccess(false), 3000);

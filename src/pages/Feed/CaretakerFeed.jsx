@@ -9,11 +9,12 @@ import {
   Loader2,
   Eye,
 } from "lucide-react";
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase";
 
 import PostBase from "../../components/core/PostBase/PostBase";
 import { SelectBetter } from "../../UI/SelectBetter";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
-import { supabase } from "../../Lib/supabaseClient";
 import { useAuth } from "../../auth/AuthContext";
 
 const SORT_OPTIONS = [
@@ -47,99 +48,167 @@ const CaretakerFeed = () => {
 
       switch (activeTab) {
         case "issues":
-          const { data: issues } = await supabase
-            .from("issues")
-            .select(`
-              id, title, description, created_at, status, visibility, category, priority,
-              profile:created_by (name),
-              upvotes:issue_upvotes (count),
-              comments:issue_comments (count)
-            `)
-            .eq("visibility", "public")
-            .order("created_at", { ascending: false });
+          const issuesRef = collection(db, "issues");
+          // Fetch all, filter client-side to avoid composite index
+          const issuesSnap = await getDocs(issuesRef);
 
-          data = issues?.map((issue) => ({
-            id: issue.id,
-            title: issue.title,
-            content: issue.description,
-            author: issue.profile?.name || "Anonymous",
-            timestamp: new Date(issue.created_at),
-            status: issue.status,
-            upvotes: issue.upvotes?.[0]?.count || 0,
-            comments: issue.comments?.[0]?.count || 0,
-            visibility: issue.visibility,
-            category: issue.category,
-            priority: issue.priority,
-          })) || [];
+          const issuesList = await Promise.all(
+            issuesSnap.docs
+              .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+              .filter(issue => issue.visibility === "public")
+              .map(async (issue) => {
+                // Get profile name
+                let authorName = "Anonymous";
+                if (issue.created_by) {
+                  try {
+                    const profileRef = doc(db, "users", issue.created_by);
+                    const profileSnap = await getDoc(profileRef);
+                    if (profileSnap.exists()) {
+                      authorName = profileSnap.data().name || "Anonymous";
+                    }
+                  } catch (e) {}
+                }
+
+                // Get upvotes count
+                let upvotes = 0;
+                try {
+                  const votesQ = query(collection(db, "votes"), where("issue_id", "==", issue.id));
+                  const votesSnap = await getDocs(votesQ);
+                  upvotes = votesSnap.size;
+                } catch (e) {}
+
+                // Get comments count
+                let comments = 0;
+                try {
+                  const commentsQ = query(collection(db, "comments"), where("issue_id", "==", issue.id));
+                  const commentsSnap = await getDocs(commentsQ);
+                  comments = commentsSnap.size;
+                } catch (e) {}
+
+                return {
+                  id: issue.id,
+                  title: issue.title,
+                  content: issue.description,
+                  author: authorName,
+                  timestamp: new Date(issue.created_at || Date.now()),
+                  status: issue.status,
+                  upvotes,
+                  comments,
+                  visibility: issue.visibility,
+                  category: issue.category,
+                  priority: issue.priority,
+                };
+              })
+          );
+          // Sort by date descending
+          data = issuesList.sort((a, b) => b.timestamp - a.timestamp);
           break;
 
         case "announcements":
-          const { data: announcements } = await supabase
-            .from("announcements")
-            .select(`
-              id, title, content, created_at, target_hostel, target_block,
-              profile:created_by (name)
-            `)
-            .order("created_at", { ascending: false });
+          const annRef = collection(db, "announcements");
+          const annSnap = await getDocs(annRef);
 
-          data = announcements?.map((ann) => ({
-            id: ann.id,
-            title: ann.title,
-            content: ann.content,
-            author: ann.profile?.name || "Admin",
-            timestamp: new Date(ann.created_at),
-            status: "Published",
-            upvotes: 0,
-            comments: 0,
-            visibility: "public",
-            target: `${ann.target_hostel}${ann.target_block ? ` - ${ann.target_block}` : ""}`,
-          })) || [];
+          const annList = await Promise.all(annSnap.docs.map(async (docSnap) => {
+            const ann = docSnap.data();
+            
+            let authorName = "Admin";
+            if (ann.created_by) {
+              try {
+                let profileRef = doc(db, "users", ann.created_by);
+                let profileSnap = await getDoc(profileRef);
+                if (!profileSnap.exists()) {
+                  profileRef = doc(db, "management", ann.created_by);
+                  profileSnap = await getDoc(profileRef);
+                }
+                if (profileSnap.exists()) {
+                  const profileData = profileSnap.data();
+                  authorName = profileData.name || profileData.full_name || "Admin";
+                }
+              } catch (e) {}
+            }
+
+            return {
+              id: docSnap.id,
+              title: ann.title,
+              content: ann.content,
+              author: authorName,
+              timestamp: new Date(ann.created_at || Date.now()),
+              status: "Published",
+              upvotes: 0,
+              comments: 0,
+              visibility: "public",
+              target: `${ann.target_hostel}${ann.target_block ? ` - ${ann.target_block}` : ""}`,
+            };
+          }));
+          data = annList.sort((a, b) => b.timestamp - a.timestamp);
           break;
 
         case "lost":
-          const { data: lostItems } = await supabase
-            .from("lost_items")
-            .select(`
-              id, title, description, created_at, status, location,
-              profile:reported_by (name)
-            `)
-            .order("created_at", { ascending: false });
+          const lostRef = collection(db, "lost_found");
+          const lostSnap = await getDocs(lostRef);
 
-          data = lostItems?.map((item) => ({
-            id: item.id,
-            title: item.title,
-            content: item.description,
-            author: item.profile?.name || "Anonymous",
-            timestamp: new Date(item.created_at),
-            status: item.status,
-            upvotes: 0,
-            comments: 0,
-            visibility: "public",
-            location: item.location,
-          })) || [];
+          const lostList = await Promise.all(lostSnap.docs.map(async (docSnap) => {
+            const item = docSnap.data();
+            
+            let authorName = "Anonymous";
+            if (item.reported_by) {
+              try {
+                const profileRef = doc(db, "users", item.reported_by);
+                const profileSnap = await getDoc(profileRef);
+                if (profileSnap.exists()) {
+                  authorName = profileSnap.data().name || "Anonymous";
+                }
+              } catch (e) {}
+            }
+
+            return {
+              id: docSnap.id,
+              title: item.title,
+              content: item.description,
+              author: authorName,
+              timestamp: new Date(item.created_at || Date.now()),
+              status: item.status,
+              upvotes: 0,
+              comments: 0,
+              visibility: "public",
+              location: item.location,
+            };
+          }));
+          data = lostList.sort((a, b) => b.timestamp - a.timestamp);
           break;
 
         case "complaints":
-          const { data: complaints } = await supabase
-            .from("complaints")
-            .select(`
-              id, description, created_at, status, complaint_type,
-              profile:raised_by (name)
-            `)
-            .order("created_at", { ascending: false });
+          const compRef = collection(db, "complaints");
+          const compSnap = await getDocs(compRef);
 
-          data = complaints?.map((comp) => ({
-            id: comp.id,
-            title: `${comp.complaint_type} Complaint`,
-            content: comp.description,
-            author: comp.profile?.name || "Anonymous",
-            timestamp: new Date(comp.created_at),
-            status: comp.status,
-            upvotes: 0,
-            comments: 0,
-            visibility: "private",
-            type: comp.complaint_type,
-          })) || [];
+          const compList = await Promise.all(compSnap.docs.map(async (docSnap) => {
+            const comp = docSnap.data();
+            
+            let authorName = "Anonymous";
+            if (comp.raised_by) {
+              try {
+                const profileRef = doc(db, "users", comp.raised_by);
+                const profileSnap = await getDoc(profileRef);
+                if (profileSnap.exists()) {
+                  authorName = profileSnap.data().name || "Anonymous";
+                }
+              } catch (e) {}
+            }
+
+            return {
+              id: docSnap.id,
+              title: `${comp.complaint_type || "General"} Complaint`,
+              content: comp.description,
+              author: authorName,
+              timestamp: new Date(comp.created_at || Date.now()),
+              status: comp.status,
+              upvotes: 0,
+              comments: 0,
+              visibility: "private",
+              type: comp.complaint_type,
+            };
+          }));
+          data = compList.sort((a, b) => b.timestamp - a.timestamp);
           break;
       }
 
@@ -261,7 +330,6 @@ const CaretakerFeed = () => {
                         active: true,
                       },
                     ]}
-                    // No action buttons for caretaker
                     hideActions
                   />
                 </motion.div>

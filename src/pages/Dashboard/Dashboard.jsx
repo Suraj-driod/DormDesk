@@ -5,6 +5,8 @@ import {
   Users, Megaphone, AlertTriangle, Search, 
   ChevronLeft, ChevronRight, Clock, TrendingUp 
 } from "lucide-react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase";
 import { useAuth } from "../../auth/AuthContext";
 import Heatmap from "../../components/Heatmap/Heatmap";
 import QuickReportFAB from "../../components/QuickReportFAB/QuickReportFAB";
@@ -19,7 +21,7 @@ const SLIDESHOW_IMAGES = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile, isAdmin, isCaretaker, isStudent, user, loading: authLoading, supabase } = useAuth();
+  const { profile, isAdmin, isCaretaker, isStudent, user, loading: authLoading } = useAuth();
   
   // Slideshow state
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -45,38 +47,38 @@ export default function Dashboard() {
 
   const fetchSlideData = async () => {
     try {
-      // Fetch top issues (most upvoted)
-      const { data: topIssue } = await supabase
-        .from("issues")
-        .select("title, id")
-        .eq("visibility", "public")
-        .neq("status", "closed")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      // Fetch all issues, filter/sort client-side to avoid composite index
+      const issuesRef = collection(db, "issues");
+      const issuesSnap = await getDocs(issuesRef);
+      const allIssues = issuesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      // Get top public issue (most recent)
+      const publicIssues = allIssues
+        .filter(i => i.visibility === "public")
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      const topIssue = publicIssues[0] || null;
 
       // Fetch latest announcement
-      const { data: latestAnnouncement } = await supabase
-        .from("announcements")
-        .select("title, id")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      const announcementsRef = collection(db, "announcements");
+      const annSnap = await getDocs(announcementsRef);
+      const allAnnouncements = annSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      const latestAnnouncement = allAnnouncements[0] || null;
 
       // Fetch recent lost item
-      const { data: recentLost } = await supabase
-        .from("lost_items")
-        .select("title, id")
-        .eq("status", "lost")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      const lostRef = collection(db, "lost_found");
+      const lostSnap = await getDocs(lostRef);
+      const lostItems = lostSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(i => i.status === "lost")
+        .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+      const recentLost = lostItems[0] || null;
 
-      // Fetch issue stats
-      const { count: pendingCount } = await supabase
-        .from("issues")
-        .select("*", { count: "exact", head: true })
-        .in("status", ["reported", "assigned", "in_progress"]);
+      // Count pending issues
+      const pendingCount = allIssues.filter(issue => {
+        return ["reported", "assigned", "in_progress", "Reported"].includes(issue.status);
+      }).length;
 
       const dynamicSlides = [
         {

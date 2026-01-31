@@ -6,6 +6,7 @@ import { Button, AlertModal } from '../../UI/Glow';
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert'; 
 import { createIssue } from '../../Services/issues.service';
+import { uploadToImgBB } from '../../Services/imgbb.service';
 
 // 1. Categories (Matches issue_category Enum)
 const CATEGORIES = [
@@ -32,7 +33,7 @@ const VISIBILITY_OPTIONS = [
 ];
 
 const ReportIssue = () => {
-  const { user, supabase } = useAuth(); 
+  const { user } = useAuth(); 
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -49,7 +50,7 @@ const ReportIssue = () => {
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
-      urgency: 'medium', // ✅ Default must match Enum case (Capitalized)
+      urgency: 'medium',
       category: '',
       visibility: '',
       dateTime: new Date().toLocaleString('en-IN', {
@@ -79,44 +80,25 @@ const ReportIssue = () => {
 
   // --- SUBMISSION HANDLER ---
   const onSubmit = async (data) => {
-    // GUARD: Never submit without authenticated user
-    if (!user?.id) {
+    if (!user?.uid) {
       console.error("Submit blocked: No authenticated user");
       showWarning("You must be logged in to submit an issue.");
-      return; // Early return - do NOT proceed
+      return;
     }
 
-    console.group("🟢 ReportIssue Submit");
-    console.log("Form data:", data);
-    console.log("User ID:", user.id);
-    console.groupEnd();
-
     try {
-      // 1. Upload Media (if exists)
+      // 1. Upload Media to ImgBB (if exists)
       let mediaUrl = null;
-      if (data.media) {
-        const file = data.media;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        const filePath = `issues/${fileName}`; 
-
-        const { error: uploadError } = await supabase.storage
-          .from('issue-media') 
-          .upload(filePath, file);
-
-        if (uploadError) {
-          console.error("Media upload failed:", uploadError);
-          throw uploadError;
+      if (data.media && data.media.type?.startsWith('image/')) {
+        try {
+          mediaUrl = await uploadToImgBB(data.media);
+        } catch (uploadError) {
+          console.warn("Image upload failed:", uploadError);
+          // Continue without image if upload fails
         }
-        
-        const { data: publicUrlData } = supabase.storage
-          .from('issue-media')
-          .getPublicUrl(filePath);
-          
-        mediaUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Build issue payload with ALL required fields
+      // 2. Build issue payload
       const issuePayload = {
         title: data.title,
         description: data.description,
@@ -124,7 +106,7 @@ const ReportIssue = () => {
         priority: data.urgency,
         status: 'Reported',
         visibility: data.visibility,
-        created_by: user.id,
+        created_by: user.uid,
         hostel: data.hostelName,
         block: data.block,
         floor: data.floor || null,
@@ -132,7 +114,7 @@ const ReportIssue = () => {
         media_url: mediaUrl,
       };
 
-      // 3. Create issue (similarity check disabled - can be re-enabled later)
+      // 3. Create issue
       const result = await createIssue(issuePayload, false);
 
       if (result.isDuplicate) {
@@ -155,10 +137,8 @@ const ReportIssue = () => {
 
     } catch (err) {
       console.error('Error submitting issue:', err);
-      // Surface real Supabase error details
-      const errorMessage = err?.message || err?.details || 'Unknown error';
-      const errorCode = err?.code ? ` (${err.code})` : '';
-      showError(`Failed to submit issue: ${errorMessage}${errorCode}`);
+      const errorMessage = err?.message || 'Unknown error';
+      showError(`Failed to submit issue: ${errorMessage}`);
     }
   };
 
@@ -175,9 +155,9 @@ const ReportIssue = () => {
   const processFile = (file) => {
     if (!file) return;
 
-    const maxSize = 50 * 1024 * 1024; 
+    const maxSize = 32 * 1024 * 1024; // 32MB for ImgBB
     if (file.size > maxSize) {
-      showWarning('File size must be less than 50MB');
+      showWarning('File size must be less than 32MB');
       return;
     }
 
@@ -189,7 +169,12 @@ const ReportIssue = () => {
       return;
     }
 
-    setMediaType(isVideo ? 'video' : 'image');
+    if (isVideo) {
+      showWarning('Video upload is not supported. Please upload an image instead.');
+      return;
+    }
+
+    setMediaType(isImage ? 'image' : 'video');
     setValue('media', file);
 
     const reader = new FileReader();
@@ -409,7 +394,7 @@ const ReportIssue = () => {
 
               <div className="mb-5">
                 <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
-                  Photo / Video Proof
+                  Photo Proof (Images only)
                 </label>
                 <div
                   className={`
@@ -431,7 +416,7 @@ const ReportIssue = () => {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     onChange={handleFileChange}
                     className="absolute w-px h-px p-0 -m-px overflow-hidden border-0"
                     style={{ clip: 'rect(0,0,0,0)' }}
@@ -439,20 +424,11 @@ const ReportIssue = () => {
 
                   {mediaPreview ? (
                     <div className="w-full h-full relative min-h-[160px]">
-                      {mediaType === 'video' ? (
-                        <video
-                          src={mediaPreview}
-                          className="w-full h-full object-cover block max-h-[300px]"
-                          controls
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <img
-                          src={mediaPreview}
-                          alt="Preview"
-                          className="w-full h-full object-cover block max-h-[300px]"
-                        />
-                      )}
+                      <img
+                        src={mediaPreview}
+                        alt="Preview"
+                        className="w-full h-full object-cover block max-h-[300px]"
+                      />
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex justify-end">
                         <button
                           type="button"
@@ -480,7 +456,7 @@ const ReportIssue = () => {
                       <span className="text-sm text-gray-600">
                         <span className="text-[#00E5FF] font-semibold">Click to upload</span> or drag and drop
                       </span>
-                      <span className="text-xs text-gray-400">Images or videos up to 50MB</span>
+                      <span className="text-xs text-gray-400">Images up to 32MB</span>
                     </div>
                   )}
                 </div>

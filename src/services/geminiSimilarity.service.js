@@ -1,5 +1,17 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { supabase } from "../Lib/supabaseClient";
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit 
+} from "firebase/firestore";
+import { db } from "../firebase";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -12,10 +24,6 @@ const REPOST_THRESHOLD = 5;
 
 /**
  * Detect similar posts using Gemini AI
- * @param {string} newTitle - Title of the new post
- * @param {string} newDescription - Description of the new post
- * @param {string} category - Category of the issue
- * @returns {Object|null} - Similar post if found, null otherwise
  */
 export const detectSimilarPost = async (newTitle, newDescription, category) => {
   try {
@@ -28,17 +36,24 @@ export const detectSimilarPost = async (newTitle, newDescription, category) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const { data: existingIssues, error } = await supabase
-      .from("issues")
-      .select("id, title, description, repost_count, priority")
-      .eq("category", category)
-      .neq("status", "closed")
-      .gte("created_at", thirtyDaysAgo.toISOString())
-      .limit(50);
+    const issuesRef = collection(db, "issues");
+    const q = query(
+      issuesRef,
+      where("category", "==", category),
+      orderBy("created_at", "desc"),
+      limit(50)
+    );
+    const snapshot = await getDocs(q);
 
-    if (error || !existingIssues?.length) {
-      return null;
-    }
+    // Filter out closed issues
+    const existingIssues = snapshot.docs
+      .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+      .filter(issue => 
+        issue.status !== "closed" && 
+        new Date(issue.created_at) >= thirtyDaysAgo
+      );
+
+    if (existingIssues.length === 0) return null;
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -99,24 +114,19 @@ export const detectSimilarPost = async (newTitle, newDescription, category) => {
 
 /**
  * Increment repost count and potentially escalate priority
- * @param {string} issueId - ID of the existing similar issue
- * @returns {Object} - Updated issue data
  */
 export const incrementRepostCount = async (issueId) => {
   try {
-    // First get current repost count
-    const { data: currentIssue, error: fetchError } = await supabase
-      .from("issues")
-      .select("repost_count, priority")
-      .eq("id", issueId)
-      .single();
+    const issueRef = doc(db, "issues", issueId);
+    const issueSnap = await getDoc(issueRef);
 
-    if (fetchError) throw fetchError;
+    if (!issueSnap.exists()) throw new Error("Issue not found");
 
+    const currentIssue = issueSnap.data();
     const newRepostCount = (currentIssue.repost_count || 0) + 1;
     let newPriority = currentIssue.priority;
 
-    // Escalate priority every 5 reposts (if not already high/emergency)
+    // Escalate priority every 5 reposts
     if (newRepostCount % REPOST_THRESHOLD === 0) {
       const priorityLevels = ["low", "medium", "high", "emergency"];
       const currentIndex = priorityLevels.indexOf(currentIssue.priority);
@@ -124,38 +134,29 @@ export const incrementRepostCount = async (issueId) => {
       if (currentIndex < priorityLevels.length - 1 && currentIndex !== -1) {
         newPriority = priorityLevels[currentIndex + 1];
       } else if (currentIndex === -1) {
-        newPriority = "medium"; // Default escalation
+        newPriority = "medium";
       }
     }
 
-    // Update the issue
-    const { data: updatedIssue, error: updateError } = await supabase
-      .from("issues")
-      .update({
-        repost_count: newRepostCount,
-        priority: newPriority,
-      })
-      .eq("id", issueId)
-      .select()
-      .single();
+    await updateDoc(issueRef, {
+      repost_count: newRepostCount,
+      priority: newPriority,
+    });
 
-    if (updateError) throw updateError;
-
+    const updatedSnap = await getDoc(issueRef);
     return {
-      ...updatedIssue,
+      id: updatedSnap.id,
+      ...updatedSnap.data(),
       priorityEscalated: newPriority !== currentIssue.priority,
     };
   } catch (error) {
     console.error("Error incrementing repost count:", error);
     throw error;
-    
   }
 };
 
 /**
  * Process new issue submission with similarity check
- * @param {Object} issueData - New issue data (MUST include created_by)
- * @returns {Object} - Result with either new issue or merged info
  */
 export const processNewIssue = async (issueData) => {
   // CRITICAL: Validate created_by before any DB operation
@@ -174,7 +175,6 @@ export const processNewIssue = async (issueData) => {
     similarPost = await detectSimilarPost(title, description, category);
   } catch (similarityError) {
     console.warn("Similarity detection failed (continuing with insert):", similarityError);
-    // Continue with normal insert
   }
 
   if (similarPost) {
@@ -192,52 +192,48 @@ export const processNewIssue = async (issueData) => {
       };
     } catch (repostError) {
       console.warn("Failed to update repost count, creating new issue instead:", repostError);
-      // Fall through to create new issue
     }
   }
 
-  // No similar post (or similarity check failed) - create new issue
-  const { data: newIssue, error } = await supabase
-    .from("issues")
-    .insert({
-      ...issueData,
-      repost_count: 0,
-    })
-    .select()
-    .single();
+  // No similar post - create new issue
+  const issuesRef = collection(db, "issues");
+  const docRef = await addDoc(issuesRef, {
+    ...issueData,
+    repost_count: 0,
+    created_at: new Date().toISOString(),
+  });
 
-  if (error) throw error;
-
+  const newSnap = await getDoc(docRef);
   return {
     isDuplicate: false,
-    issue: newIssue,
+    issue: { id: newSnap.id, ...newSnap.data() },
     message: "Issue reported successfully!",
   };
 };
 
 /**
- * Get similarity suggestions while typing (debounced usage recommended)
- * @param {string} title - Current title being typed
- * @param {string} category - Selected category
- * @returns {Array} - Array of potentially similar issues
+ * Get similarity suggestions while typing
  */
 export const getSimilaritySuggestions = async (title, category) => {
   if (!title || title.length < 10) return [];
 
   try {
-    // Simple keyword-based pre-filtering (faster than AI)
     const keywords = title.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    
     if (keywords.length === 0) return [];
 
-    const { data: potentialMatches, error } = await supabase
-      .from("issues")
-      .select("id, title, description, status, repost_count")
-      .eq("category", category)
-      .neq("status", "closed")
-      .limit(10);
+    const issuesRef = collection(db, "issues");
+    const q = query(
+      issuesRef,
+      where("category", "==", category),
+      limit(10)
+    );
+    const snapshot = await getDocs(q);
 
-    if (error || !potentialMatches) return [];
+    const potentialMatches = snapshot.docs
+      .map(docSnap => ({ id: docSnap.id, ...docSnap.data() }))
+      .filter(issue => issue.status !== "closed");
+
+    if (potentialMatches.length === 0) return [];
 
     // Score each issue by keyword matches
     const scored = potentialMatches.map(issue => {

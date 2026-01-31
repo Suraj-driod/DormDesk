@@ -4,9 +4,10 @@ import { theme } from '../../theme';
 import { Button, AlertModal } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext';
-import { useAlert } from '../../hooks/useAlert'; 
+import { useAlert } from '../../hooks/useAlert';
+import { createComplaint } from '../../Services/complaints.service';
+import { uploadToImgBB } from '../../Services/imgbb.service';
 
-// Options as requested
 const COMPLAINT_TYPES = [
   { value: 'caretaker', label: 'Caretaker' },
   { value: 'admin', label: 'Admin' },
@@ -14,7 +15,7 @@ const COMPLAINT_TYPES = [
 ];
 
 const Complaint = () => {
-  const { user, supabase } = useAuth(); 
+  const { user } = useAuth(); 
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -52,39 +53,22 @@ const Complaint = () => {
     }
 
     try {
+      // Upload media to ImgBB if exists
       let mediaUrl = null;
-      if (data.media) {
-        const file = data.media;
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        const filePath = `complaints/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('complaint-media') 
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('complaint-media')
-          .getPublicUrl(filePath);
-          
-        mediaUrl = publicUrlData.publicUrl;
+      if (data.media && data.media.type?.startsWith('image/')) {
+        try {
+          mediaUrl = await uploadToImgBB(data.media);
+        } catch (uploadError) {
+          console.warn("Image upload failed:", uploadError);
+        }
       }
 
-      const { error: insertError } = await supabase
-        .from('complaints')
-        .insert([
-          {
-            complaint_type: data.complaintType,
-            description: data.description,
-            accused_user: data.accusedName,
-            raised_by: user.id,
-            status: 'submitted', 
-          }
-        ]);
-
-      if (insertError) throw insertError;
+      await createComplaint({
+        complaint_type: data.complaintType,
+        description: data.description,
+        accused_user: data.accusedName,
+        media_url: mediaUrl,
+      }, user.uid);
 
       showSuccess('Complaint submitted successfully!', {
         onClose: () => {
@@ -112,18 +96,17 @@ const Complaint = () => {
 
   const processFile = (file) => {
     if (!file) return;
-    const maxSize = 50 * 1024 * 1024; 
+    const maxSize = 32 * 1024 * 1024; // 32MB for ImgBB
     if (file.size > maxSize) {
-      showWarning('File size must be less than 50MB');
+      showWarning('File size must be less than 32MB');
       return;
     }
-    const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
-    if (!isVideo && !isImage) {
-      showWarning('Please upload an image or video file');
+    if (!isImage) {
+      showWarning('Please upload an image file');
       return;
     }
-    setMediaType(isVideo ? 'video' : 'image');
+    setMediaType('image');
     setValue('media', file);
     const reader = new FileReader();
     reader.onload = (ev) => setMediaPreview(ev.target.result);
@@ -254,7 +237,7 @@ const Complaint = () => {
           {/* Media Proof */}
           <div className="mb-5">
             <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
-              Media Proof (Optional)
+              Media Proof (Optional - Images only)
             </label>
 
             <input {...register('media')} type="hidden" />
@@ -279,7 +262,7 @@ const Complaint = () => {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*,video/*"
+                accept="image/*"
                 onChange={handleFileChange}
                 className="absolute w-px h-px p-0 -m-px overflow-hidden border-0"
                 style={{ clip: 'rect(0,0,0,0)' }}
@@ -287,20 +270,11 @@ const Complaint = () => {
 
               {mediaPreview ? (
                 <div className="w-full h-full relative min-h-[160px]">
-                  {mediaType === 'video' ? (
-                    <video
-                      src={mediaPreview}
-                      className="w-full h-full object-cover block max-h-[300px]"
-                      controls
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  ) : (
-                    <img
-                      src={mediaPreview}
-                      alt="Preview"
-                      className="w-full h-full object-cover block max-h-[300px]"
-                    />
-                  )}
+                  <img
+                    src={mediaPreview}
+                    alt="Preview"
+                    className="w-full h-full object-cover block max-h-[300px]"
+                  />
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex justify-end">
                     <button
                       type="button"
@@ -328,7 +302,7 @@ const Complaint = () => {
                   <span className="text-sm text-gray-600">
                     <span className="text-[#00E5FF] font-semibold">Click to upload</span> or drag and drop
                   </span>
-                  <span className="text-xs text-gray-400">Images or videos up to 50MB</span>
+                  <span className="text-xs text-gray-400">Images up to 32MB</span>
                 </div>
               )}
             </div>

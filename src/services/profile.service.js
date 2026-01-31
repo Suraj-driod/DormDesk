@@ -1,170 +1,202 @@
-import { supabase } from "../Lib/supabaseClient";
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc,
+  collection, 
+  getDocs, 
+  query, 
+  where 
+} from "firebase/firestore";
+import { db } from "../firebase";
 
 // Fetch user profile
 export const fetchUserProfile = async (userId) => {
-  // First check management table (admin/caretaker)
-  const { data: mgmtData, error: mgmtError } = await supabase
-    .from("management")
-    .select("*")
-    .eq("id", userId)
-    .single();
+  try {
+    // First check management collection (admin/caretaker)
+    const mgmtRef = doc(db, "management", userId);
+    const mgmtSnap = await getDoc(mgmtRef);
 
-  if (mgmtData && !mgmtError) {
-    return {
-      ...mgmtData,
-      role: mgmtData.role,
-      name: mgmtData.full_name,
-      hostel: mgmtData.hostel_block,
-      avatarUrl: null, // Add avatar support if needed
-      stats: await getUserStats(userId, mgmtData.role),
-    };
+    if (mgmtSnap.exists()) {
+      const mgmtData = mgmtSnap.data();
+      return {
+        id: userId,
+        ...mgmtData,
+        role: mgmtData.role,
+        name: mgmtData.full_name,
+        hostel: mgmtData.hostel_block,
+        avatarUrl: mgmtData.avatar_url || null,
+        stats: await getUserStats(userId, mgmtData.role),
+      };
+    }
+
+    // Fallback to users collection (student)
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      const userData = userSnap.data();
+      return {
+        id: userId,
+        ...userData,
+        avatarUrl: userData.avatar_url || null,
+        stats: await getUserStats(userId, userData.role || "student"),
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    throw error;
   }
-
-  // Fallback to profile table (student)
-  const { data: profileData, error: profileError } = await supabase
-    .from("profile")
-    .select("*")
-    .eq("id", userId)
-    .single();
-
-  if (profileData && !profileError) {
-    return {
-      ...profileData,
-      avatarUrl: null,
-      stats: await getUserStats(userId, profileData.role || "student"),
-    };
-  }
-
-  return null;
 };
 
 // Get user statistics based on role
 export const getUserStats = async (userId, role) => {
-  if (role === "student") {
-    // Student stats: reported, resolved, pending issues
-    const { data: issues } = await supabase
-      .from("issues")
-      .select("status")
-      .eq("created_by", userId);
+  try {
+    if (role === "student") {
+      const issuesRef = collection(db, "issues");
+      const q = query(issuesRef, where("created_by", "==", userId));
+      const snapshot = await getDocs(q);
 
-    const stats = {
-      reported: issues?.length || 0,
-      resolved: issues?.filter((i) => i.status === "resolved" || i.status === "closed").length || 0,
-      pending: issues?.filter((i) => !["resolved", "closed"].includes(i.status)).length || 0,
-    };
+      let reported = 0, resolved = 0, pending = 0;
+      snapshot.docs.forEach(doc => {
+        const status = doc.data().status;
+        reported++;
+        if (status === "resolved" || status === "closed") resolved++;
+        else pending++;
+      });
 
-    return stats;
+      return { reported, resolved, pending };
+    }
+
+    if (role === "caretaker") {
+      const issuesRef = collection(db, "issues");
+      const q = query(issuesRef, where("assigned_to", "==", userId));
+      const snapshot = await getDocs(q);
+
+      let assigned = 0, completed = 0, inProgress = 0;
+      snapshot.docs.forEach(doc => {
+        const status = doc.data().status;
+        assigned++;
+        if (status === "resolved" || status === "closed") completed++;
+        else if (status === "in_progress") inProgress++;
+      });
+
+      return { assigned, completed, inProgress };
+    }
+
+    if (role === "admin") {
+      const [issuesSnap, announcementsSnap, complaintsSnap] = await Promise.all([
+        getDocs(collection(db, "issues")),
+        getDocs(collection(db, "announcements")),
+        getDocs(collection(db, "complaints")),
+      ]);
+
+      // Filter pending complaints client-side
+      const pendingComplaints = complaintsSnap.docs.filter(doc => {
+        const status = doc.data().status;
+        return status === "submitted" || status === "under_review";
+      }).length;
+
+      return {
+        totalIssues: issuesSnap.size,
+        announcements: announcementsSnap.size,
+        pendingComplaints,
+      };
+    }
+
+    return { reported: 0, resolved: 0, pending: 0 };
+  } catch (error) {
+    console.error("Error getting user stats:", error);
+    return { reported: 0, resolved: 0, pending: 0 };
   }
-
-  if (role === "caretaker") {
-    // Caretaker stats: assigned, completed, in-progress
-    const { data: issues } = await supabase
-      .from("issues")
-      .select("status")
-      .eq("assigned_to", userId);
-
-    return {
-      assigned: issues?.length || 0,
-      completed: issues?.filter((i) => i.status === "resolved" || i.status === "closed").length || 0,
-      inProgress: issues?.filter((i) => i.status === "in_progress").length || 0,
-    };
-  }
-
-  if (role === "admin") {
-    // Admin stats: total issues, announcements, complaints
-    const [
-      { count: totalIssues },
-      { count: totalAnnouncements },
-      { count: pendingComplaints },
-    ] = await Promise.all([
-      supabase.from("issues").select("*", { count: "exact", head: true }),
-      supabase.from("announcements").select("*", { count: "exact", head: true }),
-      supabase.from("complaints").select("*", { count: "exact", head: true }).in("status", ["submitted", "under_review"]),
-    ]);
-
-    return {
-      totalIssues: totalIssues || 0,
-      announcements: totalAnnouncements || 0,
-      pendingComplaints: pendingComplaints || 0,
-    };
-  }
-
-  return { reported: 0, resolved: 0, pending: 0 };
 };
 
 // Update user profile
 export const updateUserProfile = async (userId, updateData, role) => {
-  const table = role === "admin" || role === "caretaker" ? "management" : "profile";
+  try {
+    const collectionName = (role === "admin" || role === "caretaker") ? "management" : "users";
+    const userRef = doc(db, collectionName, userId);
+    
+    await updateDoc(userRef, {
+      ...updateData,
+      updated_at: new Date().toISOString(),
+    });
 
-  const { data, error } = await supabase
-    .from(table)
-    .update(updateData)
-    .eq("id", userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+    const updatedSnap = await getDoc(userRef);
+    return { id: updatedSnap.id, ...updatedSnap.data() };
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    throw error;
+  }
 };
 
 // Create profile (after signup)
 export const createProfile = async (userId, profileData) => {
-  const { data, error } = await supabase
-    .from("profile")
-    .insert({
-      id: userId,
+  try {
+    const userRef = doc(db, "users", userId);
+    await setDoc(userRef, {
       ...profileData,
-    })
-    .select()
-    .single();
+      created_at: new Date().toISOString(),
+    });
 
-  if (error) throw error;
-  return data;
+    const newSnap = await getDoc(userRef);
+    return { id: newSnap.id, ...newSnap.data() };
+  } catch (error) {
+    console.error("Error creating profile:", error);
+    throw error;
+  }
 };
 
-// Upload profile avatar
-export const uploadAvatar = async (file, userId) => {
-  const fileExt = file.name.split(".").pop();
-  const fileName = `avatars/${userId}.${fileExt}`;
-
-  // Delete existing avatar if any
-  await supabase.storage.from("avatars").remove([fileName]);
-
-  const { error: uploadError } = await supabase.storage
-    .from("avatars")
-    .upload(fileName, file, { upsert: true });
-
-  if (uploadError) throw uploadError;
-
-  const { data: publicUrlData } = supabase.storage
-    .from("avatars")
-    .getPublicUrl(fileName);
-
-  return publicUrlData.publicUrl;
+// Upload profile avatar (now using ImgBB URL)
+export const updateAvatarUrl = async (userId, avatarUrl, role) => {
+  try {
+    const collectionName = (role === "admin" || role === "caretaker") ? "management" : "users";
+    const userRef = doc(db, collectionName, userId);
+    
+    await updateDoc(userRef, { avatar_url: avatarUrl });
+    
+    return avatarUrl;
+  } catch (error) {
+    console.error("Error updating avatar:", error);
+    throw error;
+  }
 };
 
 // Fetch all caretakers (for admin assignment)
 export const fetchCaretakers = async () => {
-  const { data, error } = await supabase
-    .from("management")
-    .select("*")
-    .eq("role", "caretaker")
-    .eq("is_active", true)
-    .order("full_name");
+  try {
+    const mgmtRef = collection(db, "management");
+    // Fetch all, filter client-side to avoid composite index
+    const snapshot = await getDocs(mgmtRef);
 
-  if (error) throw error;
-  return data;
+    return snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(m => m.role === "caretaker" && m.is_active !== false)
+      .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
+  } catch (error) {
+    console.error("Error fetching caretakers:", error);
+    return [];
+  }
 };
 
 // Fetch caretakers by hostel
 export const fetchCaretakersByHostel = async (hostelBlock) => {
-  const { data, error } = await supabase
-    .from("management")
-    .select("*")
-    .eq("role", "caretaker")
-    .eq("hostel_block", hostelBlock)
-    .eq("is_active", true);
+  try {
+    const mgmtRef = collection(db, "management");
+    // Fetch all, filter client-side to avoid composite index
+    const snapshot = await getDocs(mgmtRef);
 
-  if (error) throw error;
-  return data;
+    return snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(m => 
+        m.role === "caretaker" && 
+        m.hostel_block === hostelBlock && 
+        m.is_active !== false
+      );
+  } catch (error) {
+    console.error("Error fetching caretakers by hostel:", error);
+    return [];
+  }
 };

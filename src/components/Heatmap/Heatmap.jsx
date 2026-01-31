@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Wifi, Wrench, Zap, Sparkles, HelpCircle, TrendingUp } from "lucide-react";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../../firebase";
 import { useAuth } from "../../auth/AuthContext";
-import { supabase } from "../../Lib/supabaseClient";
 
 const CATEGORY_CONFIG = {
   wifi: { 
@@ -67,16 +68,12 @@ const Heatmap = ({ compact = false }) => {
   }, []);
 
   useEffect(() => {
-    // Wait for auth to be ready
     if (authLoading) return;
 
-    // Fetch data for any authenticated user (or when user state stabilizes)
-    // Don't clear existing data on transient auth state changes
     if (user) {
       fetchCategoryStats();
       hasFetchedRef.current = true;
     } else if (!hasFetchedRef.current) {
-      // Only show empty state if we never successfully fetched
       setLoading(false);
       setCategoryStats(getEmptyStats());
     }
@@ -85,28 +82,24 @@ const Heatmap = ({ compact = false }) => {
   const fetchCategoryStats = async () => {
     setLoading(true);
     try {
-      // Use imported supabase directly for stability
-      const { data, error } = await supabase
-        .from("issues")
-        .select("category")
-        .neq("status", "closed");
-
-      if (error) {
-        console.error("Heatmap fetch error:", error);
-        throw error;
-      }
+      const issuesRef = collection(db, "issues");
+      const snapshot = await getDocs(issuesRef);
 
       if (!isMountedRef.current) return;
 
-      // Count by category
+      // Filter out closed issues and count by category
       const counts = {};
-      (data || []).forEach((issue) => {
-        const cat = issue.category || "other";
-        counts[cat] = (counts[cat] || 0) + 1;
+      let total = 0;
+      
+      snapshot.docs.forEach((doc) => {
+        const issue = doc.data();
+        if (issue.status !== "closed") {
+          const cat = issue.category || "other";
+          counts[cat] = (counts[cat] || 0) + 1;
+          total++;
+        }
       });
 
-      // Transform to array with percentages
-      const total = data?.length || 0;
       setTotalIssues(total);
 
       const stats = Object.entries(CATEGORY_CONFIG).map(([key, config]) => ({
@@ -116,12 +109,10 @@ const Heatmap = ({ compact = false }) => {
         ...config,
       }));
 
-      // Sort by count descending
       stats.sort((a, b) => b.count - a.count);
       setCategoryStats(stats);
     } catch (error) {
       console.error("Error fetching category stats:", error);
-      // Keep existing data if we have it, otherwise show empty
       if (!isMountedRef.current) return;
       if (categoryStats.length === 0) {
         setCategoryStats(getEmptyStats());
