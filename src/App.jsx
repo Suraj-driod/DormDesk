@@ -9,6 +9,7 @@ import {
   Profile,
   Issues,
   Feed,
+  PostDetail,
 } from "./pages";
 
 // Management - Admin
@@ -52,6 +53,7 @@ function App() {
             {/* Common Routes - All authenticated users */}
             <Route path="/" element={<Dashboard />} />
             <Route path="/feed" element={<Feed />} />
+            <Route path="/feed/post/:id" element={<PostDetail />} />
             <Route path="/issues" element={<Issues />} />
             <Route path="/announcements" element={<Feed />} />
             <Route path="/lost-found" element={<LostFound />} />

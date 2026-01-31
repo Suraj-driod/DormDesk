@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { TextInput } from '../../components/core';
-import { theme } from '../../theme';
 import { Button, Toast } from '../../UI/Glow.jsx';
 import { motion } from "framer-motion";
-import { LogIn } from "lucide-react";
+import { LogIn, Shield } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
 const Login = () => {
@@ -29,6 +28,8 @@ const Login = () => {
 
   const [errors, setErrors] = useState({});
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isStaffLogin, setIsStaffLogin] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -50,7 +51,13 @@ const Login = () => {
       return;
     }
 
-    const { error } = await login(formData.email, formData.password);
+    setIsSubmitting(true);
+    setErrors({});
+
+    // Pass isStaffLogin to check management collection
+    const { error } = await login(formData.email, formData.password, isStaffLogin);
+
+    setIsSubmitting(false);
 
     if (error) {
       setErrors({ general: error.message });
@@ -83,11 +90,19 @@ const Login = () => {
           transition={{ delay: 0.1, duration: 0.5 }}
           className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#00E5FF] to-[#00B8D4] shadow-[0_0_20px_rgba(0,229,255,0.4)] mb-4 text-white">
-            <LogIn size={32} strokeWidth={2.5} />
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-[0_0_20px_rgba(0,229,255,0.4)] mb-4 text-white transition-all duration-300 ${
+            isStaffLogin 
+              ? "bg-gradient-to-tr from-purple-500 to-pink-500" 
+              : "bg-gradient-to-tr from-[#00E5FF] to-[#00B8D4]"
+          }`}>
+            {isStaffLogin ? <Shield size={32} strokeWidth={2.5} /> : <LogIn size={32} strokeWidth={2.5} />}
           </div>
-          <h1 className="text-[24px] font-semibold text-[#0f172a]">Welcome Back</h1>
-          <p className="text-[14px] text-[#64748B] mt-1">Sign in to continue to DormDesk</p>
+          <h1 className="text-[24px] font-semibold text-[#0f172a]">
+            {isStaffLogin ? "Staff Login" : "Welcome Back"}
+          </h1>
+          <p className="text-[14px] text-[#64748B] mt-1">
+            {isStaffLogin ? "Sign in as Admin or Caretaker" : "Sign in to continue to DormDesk"}
+          </p>
         </motion.div>
 
         {/* Login Form */}
@@ -128,9 +143,33 @@ const Login = () => {
               </p>
             )}
 
+            {/* Staff Login Toggle */}
+            <div 
+              onClick={() => setIsStaffLogin(!isStaffLogin)}
+              className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                isStaffLogin 
+                  ? "bg-purple-50 border-2 border-purple-300" 
+                  : "bg-gray-50 border-2 border-transparent hover:border-gray-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Shield size={20} className={isStaffLogin ? "text-purple-500" : "text-gray-400"} />
+                <span className={`text-sm font-medium ${isStaffLogin ? "text-purple-700" : "text-gray-600"}`}>
+                  I'm Staff (Admin/Caretaker)
+                </span>
+              </div>
+              <div className={`w-10 h-6 rounded-full transition-all duration-200 ${
+                isStaffLogin ? "bg-purple-500" : "bg-gray-300"
+              } relative`}>
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${
+                  isStaffLogin ? "left-5" : "left-1"
+                }`} />
+              </div>
+            </div>
+
             <div className="pt-2">
-              <Button type="submit" fullWidth>
-                Sign In
+              <Button type="submit" fullWidth disabled={isSubmitting}>
+                {isSubmitting ? "Signing in..." : isStaffLogin ? "Sign In as Staff" : "Sign In"}
               </Button>
             </div>
           </motion.div>
@@ -151,6 +190,16 @@ const Login = () => {
             Register
           </button>
         </motion.p>
+        
+        {isStaffLogin && (
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="text-center text-[12px] text-purple-500 mt-2"
+          >
+            Staff accounts must be pre-registered by admin
+          </motion.p>
+        )}
       </motion.div>
 
       {/* 2. Moved Toast Here & Removed 'fixed' positioning */}

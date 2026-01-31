@@ -10,27 +10,33 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-// Fetch user profile
-export const fetchUserProfile = async (userId) => {
+// Fetch user profile - accepts userId (uid) and optionally email for management lookup
+export const fetchUserProfile = async (userId, userEmail = null) => {
   try {
-    // First check management collection (admin/caretaker)
-    const mgmtRef = doc(db, "management", userId);
-    const mgmtSnap = await getDoc(mgmtRef);
+    // If email provided, check management collection first (document ID = email)
+    if (userEmail) {
+      const mgmtRef = doc(db, "management", userEmail);
+      const mgmtSnap = await getDoc(mgmtRef);
 
-    if (mgmtSnap.exists()) {
-      const mgmtData = mgmtSnap.data();
-      return {
-        id: userId,
-        ...mgmtData,
-        role: mgmtData.role,
-        name: mgmtData.full_name,
-        hostel: mgmtData.hostel_block,
-        avatarUrl: mgmtData.avatar_url || null,
-        stats: await getUserStats(userId, mgmtData.role),
-      };
+      if (mgmtSnap.exists()) {
+        const mgmtData = mgmtSnap.data();
+        if (mgmtData.isActive === true) {
+          return {
+            id: userId,
+            email: userEmail,
+            managementDocId: userEmail,
+            ...mgmtData,
+            role: mgmtData.role,
+            name: mgmtData.full_name || mgmtData.name,
+            hostel: mgmtData.hostel_block || mgmtData.hostel,
+            avatarUrl: mgmtData.avatar_url || null,
+            stats: await getUserStats(userId, mgmtData.role),
+          };
+        }
+      }
     }
 
-    // Fallback to users collection (student)
+    // Check users collection by UID (student)
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
 
@@ -39,8 +45,9 @@ export const fetchUserProfile = async (userId) => {
       return {
         id: userId,
         ...userData,
+        role: "student",
         avatarUrl: userData.avatar_url || null,
-        stats: await getUserStats(userId, userData.role || "student"),
+        stats: await getUserStats(userId, "student"),
       };
     }
 
@@ -114,17 +121,26 @@ export const getUserStats = async (userId, role) => {
 };
 
 // Update user profile
-export const updateUserProfile = async (userId, updateData, role) => {
+// For management (admin/caretaker): use email as document ID
+// For students: use userId (uid) as document ID
+export const updateUserProfile = async (userId, updateData, role, userEmail = null) => {
   try {
-    const collectionName = (role === "admin" || role === "caretaker") ? "management" : "users";
-    const userRef = doc(db, collectionName, userId);
+    let docRef;
     
-    await updateDoc(userRef, {
+    if ((role === "admin" || role === "caretaker") && userEmail) {
+      // Management uses email as document ID
+      docRef = doc(db, "management", userEmail);
+    } else {
+      // Students use uid as document ID
+      docRef = doc(db, "users", userId);
+    }
+    
+    await updateDoc(docRef, {
       ...updateData,
       updated_at: new Date().toISOString(),
     });
 
-    const updatedSnap = await getDoc(userRef);
+    const updatedSnap = await getDoc(docRef);
     return { id: updatedSnap.id, ...updatedSnap.data() };
   } catch (error) {
     console.error("Error updating profile:", error);
@@ -150,12 +166,17 @@ export const createProfile = async (userId, profileData) => {
 };
 
 // Upload profile avatar (now using ImgBB URL)
-export const updateAvatarUrl = async (userId, avatarUrl, role) => {
+export const updateAvatarUrl = async (userId, avatarUrl, role, userEmail = null) => {
   try {
-    const collectionName = (role === "admin" || role === "caretaker") ? "management" : "users";
-    const userRef = doc(db, collectionName, userId);
+    let docRef;
     
-    await updateDoc(userRef, { avatar_url: avatarUrl });
+    if ((role === "admin" || role === "caretaker") && userEmail) {
+      docRef = doc(db, "management", userEmail);
+    } else {
+      docRef = doc(db, "users", userId);
+    }
+    
+    await updateDoc(docRef, { avatar_url: avatarUrl });
     
     return avatarUrl;
   } catch (error) {

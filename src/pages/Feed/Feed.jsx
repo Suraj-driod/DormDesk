@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -19,6 +19,7 @@ import { fetchIssuesForFeed } from "../../Services/issues.service";
 import { fetchAnnouncements } from "../../Services/announcements.service";
 import { fetchLostItems } from "../../Services/lostItems.service";
 import { fetchComplaints } from "../../Services/complaints.service";
+import { addUpvote, removeUpvote, hasUserVoted } from "../../Services/issueUpvotes.service";
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest First" },
@@ -35,15 +36,41 @@ const TABS = [
 
 const Feed = () => {
   const navigate = useNavigate();
-  const { isStudent, isAdmin, profile } = useAuth();
+  const { isStudent, isAdmin, profile, user } = useAuth();
   const [activeTab, setActiveTab] = useState("issues");
   const [sortOrder, setSortOrder] = useState("newest");
   const [currentData, setCurrentData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [votedPosts, setVotedPosts] = useState({});
 
   useEffect(() => {
     fetchData();
   }, [activeTab, profile]);
+
+  // Handle upvote toggle
+  const handleUpvote = useCallback(async (postId) => {
+    if (!user) return;
+    
+    try {
+      const hasVoted = votedPosts[postId];
+      
+      if (hasVoted) {
+        await removeUpvote(postId);
+        setVotedPosts(prev => ({ ...prev, [postId]: false }));
+        setCurrentData(prev => prev.map(post => 
+          post.id === postId ? { ...post, upvotes: Math.max(0, post.upvotes - 1) } : post
+        ));
+      } else {
+        await addUpvote(postId);
+        setVotedPosts(prev => ({ ...prev, [postId]: true }));
+        setCurrentData(prev => prev.map(post => 
+          post.id === postId ? { ...post, upvotes: post.upvotes + 1 } : post
+        ));
+      }
+    } catch (error) {
+      console.error("Upvote error:", error);
+    }
+  }, [user, votedPosts]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -66,7 +93,21 @@ const Feed = () => {
             category: issue.category,
             priority: issue.priority,
             repostCount: issue.repost_count || 0,
+            // Media as object (not array) for PostBase
+            media: issue.media_url ? { type: "image", url: issue.media_url } : null,
           })) || [];
+          
+          // Check which issues user has voted on
+          if (user?.uid && issues?.length) {
+            const voteChecks = await Promise.all(
+              issues.map(issue => hasUserVoted(issue.id, user.uid))
+            );
+            const newVotedPosts = {};
+            issues.forEach((issue, idx) => {
+              newVotedPosts[issue.id] = voteChecks[idx];
+            });
+            setVotedPosts(prev => ({ ...prev, ...newVotedPosts }));
+          }
           break;
 
         case "announcements":
@@ -82,6 +123,8 @@ const Feed = () => {
             comments: 0,
             visibility: "public",
             target: `${ann.target_hostel}${ann.target_block ? ` - ${ann.target_block}` : ""}`,
+            // Media as object (not array) for PostBase
+            media: (ann.image_url || ann.media_url) ? { type: "image", url: ann.image_url || ann.media_url } : null,
           })) || [];
           break;
 
@@ -98,7 +141,7 @@ const Feed = () => {
             comments: 0,
             visibility: "public",
             location: item.location,
-            media: item.image_url ? [{ type: "image", url: item.image_url }] : null,
+            media: item.image_url ? { type: "image", url: item.image_url } : null,
           })) || [];
           break;
 
@@ -239,6 +282,10 @@ const Feed = () => {
                     media={post.media}
                     upvoteCount={post.upvotes}
                     commentCount={post.comments}
+                    isUpvoted={votedPosts[post.id] || false}
+                    onUpvote={activeTab === "issues" ? () => handleUpvote(post.id) : undefined}
+                    onCommentClick={activeTab === "issues" ? () => navigate(`/feed/post/${post.id}`) : undefined}
+                    onPostClick={activeTab === "issues" ? () => navigate(`/feed/post/${post.id}`) : undefined}
                     currentStatus={<BadgeBetter1 status={post.status} />}
                     statusTimeline={[
                       {

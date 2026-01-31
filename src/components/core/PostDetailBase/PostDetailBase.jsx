@@ -7,10 +7,12 @@ const PostDetailBase = ({
   
   // Comments data
   comments = [],
+  totalCommentCount,
   
   // Comment input props
   commentInputPlaceholder = 'Write a comment...',
   onCommentSubmit,
+  onCommentUpvote,
   commentInputSlot,
   
   // Navigation
@@ -26,22 +28,11 @@ const PostDetailBase = ({
   className = '',
 }) => {
   const [replyingTo, setReplyingTo] = useState(null);
+  const [replyingToId, setReplyingToId] = useState(null);
   const [commentText, setCommentText] = useState('');
 
-  const BackButton = () => (
-    <button
-      onClick={onBack}
-      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-    >
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-      </svg>
-      Back
-    </button>
-  );
-
-  const CommentInput = ({ replyTo, onCancel }) => (
-    <div className={`${replyTo ? 'ml-12 mt-3' : ''}`}>
+  const renderCommentInput = (replyTo, onCancelReply) => (
+    <div className={replyTo ? 'ml-12 mt-3' : ''}>
       {commentInputSlot || (
         <div className="flex gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#00E5FF] to-[#00B8D4] flex items-center justify-center flex-shrink-0">
@@ -59,10 +50,12 @@ const PostDetailBase = ({
               <div className="absolute bottom-3 right-3 flex items-center gap-2">
                 {replyTo && (
                   <button
+                    type="button"
                     onClick={() => {
                       setReplyingTo(null);
+                      setReplyingToId(null);
                       setCommentText('');
-                      onCancel?.();
+                      onCancelReply?.();
                     }}
                     className="px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
                   >
@@ -70,10 +63,12 @@ const PostDetailBase = ({
                   </button>
                 )}
                 <button
+                  type="button"
                   onClick={() => {
-                    onCommentSubmit?.({ text: commentText, replyTo });
+                    onCommentSubmit?.({ text: commentText, replyTo, parentId: replyTo != null ? (replyingToId ?? undefined) : undefined });
                     setCommentText('');
                     setReplyingTo(null);
+                    setReplyingToId(null);
                   }}
                   disabled={!commentText.trim()}
                   className="px-4 py-1.5 bg-gradient-to-r from-[#00E5FF] to-[#00B8D4] text-white text-xs font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-[0_0_12px_rgba(0,229,255,0.4)] transition-all"
@@ -88,7 +83,7 @@ const PostDetailBase = ({
     </div>
   );
 
-  const CommentItem = ({ comment, depth = 0, renderActions }) => {
+  const CommentItem = ({ comment, depth = 0, renderActions, onUpvote }) => {
     const maxDepth = 4;
     const isMaxDepth = depth >= maxDepth;
     const hasReplies = comment.replies && comment.replies.length > 0;
@@ -137,7 +132,10 @@ const PostDetailBase = ({
                   />
                   {!isMaxDepth && (
                     <button
-                      onClick={() => setReplyingTo(comment.id)}
+                      onClick={() => {
+                        setReplyingTo(comment.author);
+                        setReplyingToId(comment.id);
+                      }}
                       className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-500 hover:text-[#00E5FF] hover:bg-[#00E5FF]/5 rounded transition-colors"
                     >
                       <ReplyIcon />
@@ -152,9 +150,9 @@ const PostDetailBase = ({
             </div>
 
             {/* Reply input */}
-            {replyingTo === comment.id && (
+            {replyingToId === comment.id && (
               <div className="mt-3">
-                <CommentInput replyTo={comment.author} onCancel={() => setReplyingTo(null)} />
+                {renderCommentInput(comment.author, () => { setReplyingTo(null); setReplyingToId(null); })}
               </div>
             )}
           </div>
@@ -171,6 +169,7 @@ const PostDetailBase = ({
                 comment={reply}
                 depth={depth + 1}
                 renderActions={renderActions}
+                onUpvote={onUpvote}
               />
             ))}
           </div>
@@ -228,7 +227,16 @@ const PostDetailBase = ({
       {/* Header with back button */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
         <div className="max-w-3xl mx-auto px-4 py-3">
-          <BackButton />
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back
+          </button>
         </div>
       </div>
 
@@ -249,7 +257,7 @@ const PostDetailBase = ({
             {commentsHeaderSlot || (
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-gray-900">
-                  Comments {comments.length > 0 && `(${comments.length})`}
+                  Comments {(totalCommentCount ?? comments.length) > 0 && `(${totalCommentCount ?? comments.length})`}
                 </h3>
                 <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                   <SortIcon />
@@ -261,12 +269,12 @@ const PostDetailBase = ({
 
           {/* Comment Input */}
           <div className="px-4 py-4 border-b border-gray-100">
-            <CommentInput />
+            {renderCommentInput(null)}
           </div>
 
           {/* Comments List */}
           <div className="px-4 py-4">
-            {comments.length === 0 ? (
+            {(totalCommentCount ?? comments.length) === 0 ? (
               emptyCommentsSlot || (
                 <div className="py-12 text-center">
                   <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
@@ -285,6 +293,7 @@ const PostDetailBase = ({
                     <CommentItem
                       comment={comment}
                       renderActions={commentActionsSlot}
+                      onUpvote={onCommentUpvote}
                     />
                   </div>
                 ))}

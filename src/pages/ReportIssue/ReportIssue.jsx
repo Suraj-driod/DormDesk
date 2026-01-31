@@ -91,7 +91,9 @@ const ReportIssue = () => {
       let mediaUrl = null;
       if (data.media && data.media.type?.startsWith('image/')) {
         try {
+          console.log("Uploading image to ImgBB...");
           mediaUrl = await uploadToImgBB(data.media);
+          console.log("Image uploaded successfully:", mediaUrl);
         } catch (uploadError) {
           console.warn("Image upload failed:", uploadError);
           // Continue without image if upload fails
