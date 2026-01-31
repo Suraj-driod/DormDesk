@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion"; 
 import { UserPlus, Sparkles, ChevronDown } from "lucide-react"; 
 
@@ -15,8 +16,16 @@ const ROLE_OPTIONS = [
   { value: 'student', label: 'Student' },
 ];
 
-const Register = ({ onNavigateToLogin }) => {
-  const { signUp } = useAuth(); 
+const Register = () => {
+  const { signUp, user, loading } = useAuth();
+  const navigate = useNavigate();
+  
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, loading, navigate]); 
 
   // --- STATE ---
   const [formData, setFormData] = useState({
@@ -158,7 +167,7 @@ const Register = ({ onNavigateToLogin }) => {
         open={showSuccessModal} 
         onClose={() => {
           setShowSuccessModal(false);
-          if (onNavigateToLogin) onNavigateToLogin();
+          navigate('/login');
         }}
       >
         <div className="text-center py-2">
@@ -364,7 +373,7 @@ const Register = ({ onNavigateToLogin }) => {
                     Already have an account?{' '}
                     <button 
                       type="button" 
-                      onClick={onNavigateToLogin} 
+                      onClick={() => navigate('/login')} 
                       className="text-[#00B8D4] font-semibold hover:text-[#00E5FF] hover:underline transition-colors bg-transparent border-none cursor-pointer p-0"
                     >
                       Login

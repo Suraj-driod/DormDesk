@@ -1,76 +1,24 @@
-import React, { useState, useMemo } from "react";
-import { motion } from "framer-motion";
+import React, { useState, useEffect, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Filter, CheckCircle, Clock, 
-  User, Briefcase, ChevronRight, UserPlus 
+  User, Briefcase, ChevronRight, UserPlus, RefreshCw, X
 } from "lucide-react";
 
-// --- Custom Components ---
 import { SelectBetter } from "../../UI/SelectBetter"; 
-import { BadgeBetter1 } from "../../UI/BadgeBetter"; 
+import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { fetchPendingIssues, fetchIssues, assignIssue } from "../../Services/issues.service";
+import { fetchCaretakers } from "../../Services/profile.service";
+import { useAuth } from "../../auth/AuthContext";
 
-// --- MOCK DATA ---
-const MOCK_CASES = [
-  {
-    id: 1,
-    title: "Water Leakage in Corridor",
-    category: "Plumbing",
-    priority: "High",
-    status: "Reported",
-    hostel: "Sahyadri",
-    block: "A",
-    room_no: "Corridor 2",
-    assigned_to: null, // Pending
-    caretaker_name: null,
-    created_at: "2026-01-30T09:00:00",
-  },
-  {
-    id: 2,
-    title: "Sparking Switchboard",
-    category: "Electrical",
-    priority: "High",
-    status: "Assigned",
-    hostel: "Aravali",
-    block: "B",
-    room_no: "102",
-    assigned_to: "ct_1",
-    caretaker_name: "Ramesh Kumar",
-    created_at: "2026-01-29T14:30:00",
-  },
-  {
-    id: 3,
-    title: "Broken Window Latch",
-    category: "Carpenter",
-    priority: "Low",
-    status: "Reported",
-    hostel: "Sahyadri",
-    block: "C",
-    room_no: "305",
-    assigned_to: null, // Pending
-    caretaker_name: null,
-    created_at: "2026-01-28T11:00:00",
-  },
-  {
-    id: 4,
-    title: "Mess Fan Not Working",
-    category: "Electrical",
-    priority: "Medium",
-    status: "InProgress",
-    hostel: "Aravali",
-    block: "Mess",
-    room_no: "Main Hall",
-    assigned_to: "ct_2",
-    caretaker_name: "Suresh Singh",
-    created_at: "2026-01-27T10:00:00",
-  },
-];
-
-// --- HELPER: PRIORITY DOT ---
 const PriorityDot = ({ priority }) => {
-  const color = 
-    priority === 'High' ? 'bg-red-500' : 
-    priority === 'Medium' ? 'bg-orange-400' : 
-    'bg-green-500';
+  const colorMap = {
+    emergency: 'bg-red-600',
+    high: 'bg-red-500',
+    medium: 'bg-orange-400',
+    low: 'bg-green-500',
+  };
+  const color = colorMap[priority] || 'bg-gray-400';
 
   return (
     <div className="flex items-center gap-1.5" title={`Priority: ${priority}`}>
@@ -81,184 +29,192 @@ const PriorityDot = ({ priority }) => {
 };
 
 const AdminCases = () => {
-  const [cases, setCases] = useState(MOCK_CASES);
-  const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
+  const [cases, setCases] = useState([]);
+  const [caretakers, setCaretakers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // --- UI STATE ---
-  const [activeTab, setActiveTab] = useState("pending"); // 'pending' | 'assigned'
+  // UI State
+  const [activeTab, setActiveTab] = useState("pending");
   const [searchQuery, setSearchQuery] = useState("");
-
-  // --- FILTER STATES ---
+  
+  // Filters
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [hostelFilter, setHostelFilter] = useState("All");
-  const [blockFilter, setBlockFilter] = useState("All"); // Added Block Filter
+  const [blockFilter, setBlockFilter] = useState("All");
   const [caretakerFilter, setCaretakerFilter] = useState("All");
 
-  // --- FILTER LOGIC ---
+  // Assignment Modal
+  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [selectedCase, setSelectedCase] = useState(null);
+  const [selectedCaretaker, setSelectedCaretaker] = useState("");
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [issuesData, caretakersData] = await Promise.all([
+        fetchIssues(),
+        fetchCaretakers(),
+      ]);
+      setCases(issuesData || []);
+      setCaretakers(caretakersData || []);
+    } catch (error) {
+      console.error("Error loading data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredCases = useMemo(() => {
     return cases.filter(item => {
-      // 1. Tab Logic
+      // Tab logic
       if (activeTab === "pending") {
         if (item.assigned_to !== null) return false;
       } else {
         if (item.assigned_to === null) return false;
       }
 
-      // 2. Search
+      // Search
       const query = searchQuery.toLowerCase();
       const matchesSearch = 
-        item.title.toLowerCase().includes(query) ||
-        item.room_no.toLowerCase().includes(query) ||
-        (item.caretaker_name && item.caretaker_name.toLowerCase().includes(query));
+        item.title?.toLowerCase().includes(query) ||
+        item.room_no?.toLowerCase().includes(query) ||
+        item.assigned_profile?.name?.toLowerCase().includes(query);
 
       if (!matchesSearch) return false;
 
-      // 3. Dropdown Filters
+      // Filters
       if (categoryFilter !== "All" && item.category !== categoryFilter) return false;
       if (hostelFilter !== "All" && item.hostel !== hostelFilter) return false;
-      if (blockFilter !== "All" && item.block !== blockFilter) return false; // Block Logic
-      if (caretakerFilter !== "All" && item.caretaker_name !== caretakerFilter) return false;
+      if (blockFilter !== "All" && item.block !== blockFilter) return false;
+      if (activeTab === 'assigned' && caretakerFilter !== "All" && item.assigned_profile?.name !== caretakerFilter) return false;
 
       return true;
     });
   }, [cases, activeTab, searchQuery, categoryFilter, hostelFilter, blockFilter, caretakerFilter]);
 
-  // --- ACTIONS ---
-  const handleAssign = (id) => {
-    console.log("Open Assign Modal for ID:", id);
-    alert(`Open modal to assign Caretaker for Case #${id}`);
+  const handleOpenAssignModal = (caseItem) => {
+    setSelectedCase(caseItem);
+    setSelectedCaretaker("");
+    setAssignModalOpen(true);
   };
 
-  // --- OPTIONS GENERATION ---
+  const handleAssign = async () => {
+    if (!selectedCaretaker || !selectedCase) return;
+    
+    try {
+      await assignIssue(selectedCase.id, selectedCaretaker, user?.id);
+      setCases(prev => prev.map(c => 
+        c.id === selectedCase.id 
+          ? { ...c, assigned_to: selectedCaretaker, status: 'assigned', assigned_profile: caretakers.find(ct => ct.id === selectedCaretaker) }
+          : c
+      ));
+      setAssignModalOpen(false);
+      setSelectedCase(null);
+    } catch (error) {
+      console.error("Error assigning:", error);
+      alert("Failed to assign caretaker");
+    }
+  };
+
+  // Options
   const categoryOptions = [
     { value: "All", label: "All Categories" },
     ...[...new Set(cases.map(i => i.category).filter(Boolean))].map(c => ({ value: c, label: c }))
   ];
-
   const hostelOptions = [
     { value: "All", label: "All Hostels" },
     ...[...new Set(cases.map(i => i.hostel).filter(Boolean))].map(h => ({ value: h, label: h }))
   ];
-
   const blockOptions = [
     { value: "All", label: "All Blocks" },
     ...[...new Set(cases.map(i => i.block).filter(Boolean))].map(b => ({ value: b, label: `Block ${b}` }))
   ];
-
   const caretakerOptions = [
     { value: "All", label: "All Caretakers" },
-    ...[...new Set(cases.map(i => i.caretaker_name).filter(Boolean))].map(c => ({ value: c, label: c }))
+    ...caretakers.map(c => ({ value: c.full_name, label: c.full_name }))
   ];
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
       <div className="max-w-7xl mx-auto">
         
-        {/* --- HEADER --- */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Case Assignment</h1>
             <p className="text-gray-500 text-sm mt-1">Assign pending issues to caretakers and track workload.</p>
           </div>
           
-          {/* Custom Tabs */}
+          {/* Tabs */}
           <div className="bg-white p-1.5 rounded-xl border border-gray-200 flex shadow-sm">
             <button
               onClick={() => setActiveTab("pending")}
-              className={`
-                relative px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2
-                ${activeTab === "pending" ? "text-white" : "text-gray-500 hover:bg-gray-50"}
-              `}
+              className={`relative px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2
+                ${activeTab === "pending" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
             >
               {activeTab === "pending" && (
-                <motion.div
-                  layoutId="caseTab"
-                  className="absolute inset-0 bg-orange-500 rounded-lg shadow-md"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
+                <motion.div layoutId="caseTab" className="absolute inset-0 bg-orange-500 rounded-lg shadow-md" />
               )}
               <span className="relative z-10 flex items-center gap-2">
-                <Clock size={16} /> Pending Assignment
+                <Clock size={16} /> Pending
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab("assigned")}
-              className={`
-                relative px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2
-                ${activeTab === "assigned" ? "text-white" : "text-gray-500 hover:bg-gray-50"}
-              `}
+              className={`relative px-6 py-2 rounded-lg text-sm font-semibold transition-all duration-300 flex items-center gap-2
+                ${activeTab === "assigned" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
             >
               {activeTab === "assigned" && (
-                <motion.div
-                  layoutId="caseTab"
-                  className="absolute inset-0 bg-blue-600 rounded-lg shadow-md"
-                  transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                />
+                <motion.div layoutId="caseTab" className="absolute inset-0 bg-blue-600 rounded-lg shadow-md" />
               )}
               <span className="relative z-10 flex items-center gap-2">
-                <Briefcase size={16} /> Assigned Cases
+                <Briefcase size={16} /> Assigned
               </span>
             </button>
           </div>
         </div>
 
-        {/* --- FILTER BAR --- */}
+        {/* Filter Bar */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6 flex flex-col gap-4">
           <div className="flex flex-col md:flex-row gap-4 items-center">
-            {/* Search */}
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
               <input 
                 type="text" 
-                placeholder={activeTab === 'pending' ? "Search issues..." : "Search issues or caretaker name..."}
+                placeholder={activeTab === 'pending' ? "Search issues..." : "Search issues or caretaker..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 outline-none text-sm transition-all"
               />
             </div>
+            <button onClick={loadData} className="p-3 border border-gray-200 rounded-xl hover:bg-gray-50">
+              <RefreshCw size={18} />
+            </button>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-             <SelectBetter 
-               options={categoryOptions}
-               value={categoryFilter}
-               onChange={(e) => setCategoryFilter(e.target.value)}
-               placeholder="Category"
-               icon={Filter}
-             />
-             <SelectBetter 
-               options={hostelOptions}
-               value={hostelFilter}
-               onChange={(e) => setHostelFilter(e.target.value)}
-               placeholder="Hostel"
-             />
-             <SelectBetter 
-               options={blockOptions}
-               value={blockFilter}
-               onChange={(e) => setBlockFilter(e.target.value)}
-               placeholder="Block"
-             />
-             
-             {/* Only show Caretaker filter on Assigned Tab */}
-             {activeTab === 'assigned' && (
-               <div className="col-span-2 md:col-span-1">
-                 <SelectBetter 
-                   options={caretakerOptions}
-                   value={caretakerFilter}
-                   onChange={(e) => setCaretakerFilter(e.target.value)}
-                   placeholder="Caretaker"
-                   icon={User}
-                 />
-               </div>
-             )}
+            <SelectBetter options={categoryOptions} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} placeholder="Category" icon={Filter} />
+            <SelectBetter options={hostelOptions} value={hostelFilter} onChange={(e) => setHostelFilter(e.target.value)} placeholder="Hostel" />
+            <SelectBetter options={blockOptions} value={blockFilter} onChange={(e) => setBlockFilter(e.target.value)} placeholder="Block" />
+            {activeTab === 'assigned' && (
+              <SelectBetter options={caretakerOptions} value={caretakerFilter} onChange={(e) => setCaretakerFilter(e.target.value)} placeholder="Caretaker" icon={User} />
+            )}
           </div>
         </div>
 
-        {/* --- TABLE SECTION --- */}
+        {/* Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           {loading ? (
-            <div className="p-20 text-center text-gray-500">Loading cases...</div>
+            <div className="p-20 text-center text-gray-500">
+              <div className="w-10 h-10 border-4 border-[#00E5FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+              Loading cases...
+            </div>
           ) : filteredCases.length === 0 ? (
             <div className="p-20 text-center flex flex-col items-center">
               <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${activeTab === 'pending' ? 'bg-orange-50' : 'bg-blue-50'}`}>
@@ -272,27 +228,23 @@ const AdminCases = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100">
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Issue</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Issue</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Location</th>
                     {activeTab === 'assigned' && (
-                       <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned To</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Assigned To</th>
                     )}
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Action</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredCases.map((item) => (
-                    <tr 
-                      key={item.id} 
-                      className="hover:bg-gray-50/50 transition-colors group"
-                    >
-                      {/* Issue Info */}
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
                           <span className="font-semibold text-gray-800 text-sm">{item.title}</span>
                           <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border capitalize">
                               {item.category}
                             </span>
                             <PriorityDot priority={item.priority} />
@@ -300,7 +252,6 @@ const AdminCases = () => {
                         </div>
                       </td>
 
-                      {/* Location */}
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-600">
                           <span className="font-medium text-gray-800">{item.hostel}</span>
@@ -309,39 +260,34 @@ const AdminCases = () => {
                         </div>
                       </td>
 
-                      {/* Caretaker (Assigned Tab Only) */}
                       {activeTab === 'assigned' && (
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                              {item.caretaker_name?.charAt(0)}
+                              {item.assigned_profile?.full_name?.charAt(0) || item.assigned_profile?.name?.charAt(0) || '?'}
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-sm font-medium text-gray-800">{item.caretaker_name}</span>
+                              <span className="text-sm font-medium text-gray-800">{item.assigned_profile?.full_name || item.assigned_profile?.name}</span>
                               <span className="text-[10px] text-gray-400">Caretaker</span>
                             </div>
                           </div>
                         </td>
                       )}
 
-                      {/* Status */}
                       <td className="px-6 py-4">
                         <BadgeBetter1 status={item.status} />
                       </td>
 
-                      {/* Action Button */}
                       <td className="px-6 py-4 text-right">
                         {activeTab === 'pending' ? (
                           <button 
-                            onClick={() => handleAssign(item.id)}
-                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm shadow-orange-200 transition-all flex items-center gap-2 ml-auto"
+                            onClick={() => handleOpenAssignModal(item)}
+                            className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-all flex items-center gap-2 ml-auto"
                           >
                             <UserPlus size={16} /> Assign
                           </button>
                         ) : (
-                          <button 
-                            className="text-gray-400 hover:text-blue-600 font-medium text-sm flex items-center gap-1 ml-auto transition-colors"
-                          >
+                          <button className="text-gray-400 hover:text-blue-600 font-medium text-sm flex items-center gap-1 ml-auto">
                             Reassign <ChevronRight size={14} />
                           </button>
                         )}
@@ -354,6 +300,72 @@ const AdminCases = () => {
           )}
         </div>
       </div>
+
+      {/* Assignment Modal */}
+      <AnimatePresence>
+        {assignModalOpen && selectedCase && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+            onClick={() => setAssignModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-gray-800">Assign Caretaker</h2>
+                <button onClick={() => setAssignModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-sm text-gray-600 mb-2">Issue:</p>
+                <p className="font-semibold text-gray-800">{selectedCase.title}</p>
+                <p className="text-sm text-gray-500 mt-1">{selectedCase.hostel} | Block {selectedCase.block}</p>
+              </div>
+
+              <div className="mb-6">
+                <label className="text-sm font-medium text-gray-700 block mb-2">Select Caretaker</label>
+                <select
+                  value={selectedCaretaker}
+                  onChange={(e) => setSelectedCaretaker(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-blue-500 outline-none"
+                >
+                  <option value="">Choose a caretaker...</option>
+                  {caretakers.map((ct) => (
+                    <option key={ct.id} value={ct.id}>
+                      {ct.full_name} - {ct.hostel_block || 'All Blocks'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setAssignModalOpen(false)}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAssign}
+                  disabled={!selectedCaretaker}
+                  className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Assign
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

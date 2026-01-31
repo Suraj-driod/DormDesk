@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import {
   Register,
   Login,
@@ -9,41 +9,116 @@ import {
   Profile,
   Issues,
   Feed,
-} from './pages';
-import IssuesAdmin from './management/admin/IssuesAdmin';
-import AdminAnnouncement from './management/admin/AdminAnnouncement';
-import AdminLost from './management/admin/AdminLost';
-import AdminCases from './management/admin/AdminCases';
-import AppLayout from './layouts/AppLayout';
-import { RequireAuth } from './auth/RequireAuth';
+} from "./pages";
+
+// Management - Admin
+import IssuesAdmin from "./management/admin/IssuesAdmin";
+import AdminAnnouncement from "./management/admin/AdminAnnouncement";
+import AdminLost from "./management/admin/AdminLost";
+import AdminCases from "./management/admin/AdminCases";
+
+// Management - Caretaker
+import Assignment from "./management/caretaker/Assignment";
+
+// Layout & Auth
+import AppLayout from "./layouts/AppLayout";
+import { RequireAuth } from "./auth/RequireAuth";
+import { RequireAdmin } from "./auth/RequireAdmin";
+import { RequireCaretaker } from "./auth/RequireCaretaker";
+
+// UI Components
+import { ErrorBoundary, NotFound } from "./UI/Glow";
+
+// Caretaker Feed (read-only)
+import CaretakerFeed from "./pages/Feed/CaretakerFeed";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public routes - no layout */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          {/* Public routes - no layout */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
 
-        {/* Protected routes - with AppLayout */}
-        <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/feed" element={<Feed />} />
-          <Route path="/issues" element={<Issues />} />
-          <Route path="/report-issue" element={<ReportIssue />} />
-          <Route path="/announcements" element={<Feed />} />
-          <Route path="/lost-found" element={<LostFound />} />
-          <Route path="/complaints" element={<Complaint />} />
-          <Route path="/profile" element={<Profile />} />
+          {/* Protected routes - with AppLayout */}
+          <Route
+            element={
+              <RequireAuth>
+                <AppLayout />
+              </RequireAuth>
+            }
+          >
+            {/* Common Routes - All authenticated users */}
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/issues" element={<Issues />} />
+            <Route path="/announcements" element={<Feed />} />
+            <Route path="/lost-found" element={<LostFound />} />
+            <Route path="/profile" element={<Profile />} />
 
-          {/* Admin routes */}
-          <Route path="/admin/issues" element={<IssuesAdmin />} />
-          <Route path="/admin/announcements" element={<AdminAnnouncement />} />
-          <Route path="/admin/lost" element={<AdminLost />} />
-          <Route path="/admin/cases" element={<AdminCases />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+            {/* Student-specific routes */}
+            <Route path="/report-issue" element={<ReportIssue />} />
+            <Route path="/complaints" element={<Complaint />} />
+
+            {/* Admin Routes */}
+            <Route
+              path="/admin/issues"
+              element={
+                <RequireAdmin>
+                  <IssuesAdmin />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/announcements"
+              element={
+                <RequireAdmin>
+                  <AdminAnnouncement />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/lost"
+              element={
+                <RequireAdmin>
+                  <AdminLost />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/cases"
+              element={
+                <RequireAdmin>
+                  <AdminCases />
+                </RequireAdmin>
+              }
+            />
+
+            {/* Caretaker Routes */}
+            <Route
+              path="/caretaker/assignments"
+              element={
+                <RequireCaretaker>
+                  <Assignment />
+                </RequireCaretaker>
+              }
+            />
+            <Route
+              path="/caretaker/feed"
+              element={
+                <RequireCaretaker>
+                  <CaretakerFeed />
+                </RequireCaretaker>
+              }
+            />
+          </Route>
+
+          {/* 404 Catch-all */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 

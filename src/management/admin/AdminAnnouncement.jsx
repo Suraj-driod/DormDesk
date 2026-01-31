@@ -1,33 +1,37 @@
 import { useForm } from 'react-hook-form';
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Megaphone, X, Plus, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Megaphone, X, Plus, Image as ImageIcon, Trash2, CheckCircle } from 'lucide-react';
 
-// --- Custom Components ---
 import { theme } from '../../theme';
 import { Button } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext'; 
+import { createAnnouncement } from '../../Services/announcements.service';
+import { supabase } from '../../Lib/supabaseClient';
 
-// --- OPTIONS ---
 const TARGET_HOSTELS = [
   { value: 'All', label: 'All Hostels' },
   { value: 'Sahyadri', label: 'Sahyadri' },
   { value: 'Aravali', label: 'Aravali' },
+  { value: 'Nilgiri', label: 'Nilgiri' },
+  { value: 'Vindhya', label: 'Vindhya' },
 ];
 
 const TARGET_BLOCKS = [
   { value: 'All', label: 'All Blocks' },
   { value: 'A', label: 'Block A' },
   { value: 'B', label: 'Block B' },
+  { value: 'C', label: 'Block C' },
   { value: 'Mess', label: 'Mess Area' },
 ];
 
 const AdminAnnouncement = () => {
-  const { user, supabase } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [imagePreview, setImagePreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const fileInputRef = useRef(null);
 
   const {
@@ -42,11 +46,10 @@ const AdminAnnouncement = () => {
     defaultValues: {
       targetHostel: 'All',
       targetBlock: 'All',
-      pollOptions: ['', ''], // Default 2 options
+      pollOptions: ['', ''],
     },
   });
 
-  // Watch values for UI updates
   const watchedHostel = watch('targetHostel');
   const watchedBlock = watch('targetBlock');
   const watchedPollOptions = watch('pollOptions');
@@ -56,9 +59,9 @@ const AdminAnnouncement = () => {
     register('targetBlock');
   }, [register]);
 
-  // --- SUBMIT LOGIC ---
   const onSubmit = async (data) => {
     if (!user) return alert("Please login first.");
+    if (!isAdmin) return alert("Only admins can create announcements.");
 
     try {
       // 1. Upload Image (Optional)
@@ -68,7 +71,6 @@ const AdminAnnouncement = () => {
         const fileExt = file.name.split('.').pop();
         const fileName = `announcements/${Date.now()}_${user.id}.${fileExt}`;
 
-        // Ensure 'announcements-media' bucket exists in Supabase Storage
         const { error: uploadError } = await supabase.storage
           .from('announcements-media') 
           .upload(fileName, file);
@@ -82,7 +84,7 @@ const AdminAnnouncement = () => {
         imageUrl = publicUrlData.publicUrl;
       }
 
-      // 2. Prepare Poll JSON (if enabled)
+      // 2. Prepare Poll JSON
       let pollDataJSON = null;
       if (showPoll) {
         const validOptions = data.pollOptions.filter(opt => opt.trim() !== '');
@@ -98,28 +100,23 @@ const AdminAnnouncement = () => {
           options: validOptions,
           votes: initialVotes,
           total_votes: 0,
-          voters: [] // Array of user_ids who voted
+          voters: []
         };
       }
 
-      // 3. Insert into DB
-      const { error: insertError } = await supabase
-        .from('announcements')
-        .insert([
-          {
-            title: data.title,
-            content: data.description,
-            target_hostel: data.targetHostel,
-            target_block: data.targetBlock,
-            image_url: imageUrl,
-            poll_data: pollDataJSON, // Ensure DB has 'poll_data' (jsonb) column
-            created_by: user.id,
-          }
-        ]);
+      // 3. Create announcement
+      await createAnnouncement({
+        title: data.title,
+        content: data.description,
+        target_hostel: data.targetHostel,
+        target_block: data.targetBlock,
+        image_url: imageUrl,
+        poll_data: pollDataJSON,
+      }, user.id);
 
-      if (insertError) throw insertError;
-
-      alert('Announcement published successfully!');
+      setSubmitSuccess(true);
+      setTimeout(() => setSubmitSuccess(false), 3000);
+      
       reset();
       setImagePreview(null);
       setShowPoll(false);
@@ -130,7 +127,6 @@ const AdminAnnouncement = () => {
     }
   };
 
-  // --- HELPERS ---
   const handleSelectChange = (name, value) => {
     setValue(name, value);
     trigger(name);
@@ -155,8 +151,7 @@ const AdminAnnouncement = () => {
 
   const removePollOption = (index) => {
     if (watchedPollOptions.length > 2) {
-      const newOpts = watchedPollOptions.filter((_, i) => i !== index);
-      setValue('pollOptions', newOpts);
+      setValue('pollOptions', watchedPollOptions.filter((_, i) => i !== index));
     }
   };
 
@@ -172,13 +167,28 @@ const AdminAnnouncement = () => {
     <div className="min-h-screen bg-[#F8F9FA] p-6 font-['Poppins',sans-serif]">
       <div className="max-w-3xl mx-auto">
         
+        {/* Success Toast */}
+        <AnimatePresence>
+          {submitSuccess && (
+            <motion.div
+              initial={{ opacity: 0, y: -50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -50 }}
+              className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2"
+            >
+              <CheckCircle size={20} />
+              Announcement published successfully!
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Header */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-tr from-[#00B8D4] to-[#00E5FF] rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-cyan-200">
             <Megaphone className="text-white" size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">New Announcement</h1>
-          <p className="text-gray-500">Broadcast updates to students.</p>
+          <p className="text-gray-500">Broadcast updates to students. Admin only.</p>
         </div>
 
         {/* Form */}
@@ -202,29 +212,25 @@ const AdminAnnouncement = () => {
 
           {/* Target Selection */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <SelectBetter
-                label="Target Hostel"
-                name="targetHostel"
-                options={TARGET_HOSTELS}
-                value={watchedHostel}
-                onChange={(e) => handleSelectChange('targetHostel', e.target.value)}
-                error={errors.targetHostel?.message}
-                required
-              />
-            </div>
-            <div>
-              <SelectBetter
-                label="Target Block"
-                name="targetBlock"
-                options={TARGET_BLOCKS}
-                value={watchedBlock}
-                onChange={(e) => handleSelectChange('targetBlock', e.target.value)}
-              />
-            </div>
+            <SelectBetter
+              label="Target Hostel"
+              name="targetHostel"
+              options={TARGET_HOSTELS}
+              value={watchedHostel}
+              onChange={(e) => handleSelectChange('targetHostel', e.target.value)}
+              error={errors.targetHostel?.message}
+              required
+            />
+            <SelectBetter
+              label="Target Block"
+              name="targetBlock"
+              options={TARGET_BLOCKS}
+              value={watchedBlock}
+              onChange={(e) => handleSelectChange('targetBlock', e.target.value)}
+            />
           </div>
 
-          {/* Description */}
+          {/* Content */}
           <div className="mb-6">
             <label className="text-sm font-bold text-gray-700 block mb-2 ml-1">
               Content<span className="text-red-500 ml-0.5">*</span>
@@ -250,8 +256,8 @@ const AdminAnnouncement = () => {
                 relative overflow-hidden min-h-[160px] rounded-3xl cursor-pointer
                 flex flex-col items-center justify-center transition-all duration-300
                 ${imagePreview 
-                  ? `p-0 border-2 border-solid border-[#00B8D4]` 
-                  : `p-6 border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-white hover:border-[#00B8D4]`
+                  ? 'p-0 border-2 border-solid border-[#00B8D4]' 
+                  : 'p-6 border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-white hover:border-[#00B8D4]'
                 }
                 ${dragActive ? 'bg-blue-50 border-[#00B8D4]' : ''}
               `}
@@ -299,7 +305,10 @@ const AdminAnnouncement = () => {
             <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 9h8"/><path d="M8 13h6"/><path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-5l-5 3v-3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h12z"/></svg>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M8 9h8"/><path d="M8 13h6"/>
+                    <path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-5l-5 3v-3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h12z"/>
+                  </svg>
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-800">Add a Poll</h3>
@@ -335,22 +344,14 @@ const AdminAnnouncement = () => {
                           className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:border-purple-400 outline-none"
                         />
                         {watchedPollOptions.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => removePollOption(index)}
-                            className="p-2 text-gray-400 hover:text-red-500"
-                          >
+                          <button type="button" onClick={() => removePollOption(index)} className="p-2 text-gray-400 hover:text-red-500">
                             <X size={18} />
                           </button>
                         )}
                       </div>
                     ))}
                     {watchedPollOptions.length < 5 && (
-                      <button
-                        type="button"
-                        onClick={addPollOption}
-                        className="ml-8 text-sm font-medium text-purple-600 hover:text-purple-700 flex items-center gap-1 mt-2"
-                      >
+                      <button type="button" onClick={addPollOption} className="ml-8 text-sm font-medium text-purple-600 hover:text-purple-700 flex items-center gap-1 mt-2">
                         <Plus size={16} /> Add Option
                       </button>
                     )}
@@ -364,7 +365,6 @@ const AdminAnnouncement = () => {
           <Button type="submit" fullWidth disabled={isSubmitting}>
             {isSubmitting ? 'Publishing...' : 'Publish Announcement'}
           </Button>
-
         </form>
       </div>
     </div>

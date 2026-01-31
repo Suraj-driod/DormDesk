@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { TextInput } from '../../components/core';
 import { theme } from '../../theme';
 import { Button, Toast } from '../../UI/Glow.jsx';
@@ -6,8 +7,20 @@ import { motion } from "framer-motion";
 import { LogIn } from "lucide-react";
 import { useAuth } from "../../auth/AuthContext";
 
-const Login = ({ onNavigateToRegister }) => {
-  const { login } = useAuth();
+const Login = () => {
+  const { login, user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Get redirect path from location state or default to dashboard
+  const from = location.state?.from?.pathname || "/";
+  
+  // Redirect if already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, from]);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -46,11 +59,11 @@ const Login = ({ onNavigateToRegister }) => {
 
     setShowSuccess(true);
 
+    // Navigate to dashboard after brief success message
     setTimeout(() => {
       setShowSuccess(false);
-    }, 2000);
-
-    console.log("Login success");
+      navigate(from, { replace: true });
+    }, 800);
   };
 
   return (
@@ -132,7 +145,7 @@ const Login = ({ onNavigateToRegister }) => {
           Don't have an account?{' '}
           <button 
             type="button" 
-            onClick={onNavigateToRegister} 
+            onClick={() => navigate('/register')} 
             className="text-[#00B8D4] font-semibold hover:text-[#00E5FF] hover:underline transition-colors bg-transparent border-none cursor-pointer p-0"
           >
             Register

@@ -1,4 +1,9 @@
 import React, { useMemo } from "react";
+import { useLocation } from "react-router-dom";
+import { 
+  Home, LayoutDashboard, ClipboardList, Megaphone, Plus, Users, User,
+  Settings, Search, AlertTriangle, FileText, Briefcase, Eye
+} from "lucide-react";
 
 export function Sidebar({
   role,
@@ -9,27 +14,53 @@ export function Sidebar({
   activeKey,
   onNavigate,
 }) {
+  const location = useLocation();
+  
   const items = useMemo(() => {
     if (role === "admin") {
       return [
-        { key: "dashboard", label: "Dashboard", icon: DashboardIcon },
-        { key: "manage-issues", label: "Manage Issues", icon: IssuesIcon },
-        { key: "announcements", label: "Announcements", icon: MegaphoneIcon },
+        { key: "/", label: "Dashboard", icon: LayoutDashboard },
+        { key: "/admin/issues", label: "Manage Issues", icon: ClipboardList },
+        { key: "/admin/announcements", label: "Announcements", icon: Megaphone },
+        { key: "/admin/lost", label: "Lost & Found", icon: Search },
+        { key: "/admin/cases", label: "Case Assignment", icon: Briefcase },
+        { key: "/feed", label: "Public Feed", icon: Eye },
+        { key: "/profile", label: "Profile", icon: User },
       ];
     }
+    
+    if (role === "caretaker") {
+      return [
+        { key: "/", label: "Dashboard", icon: LayoutDashboard },
+        { key: "/caretaker/assignments", label: "My Assignments", icon: Briefcase },
+        { key: "/caretaker/feed", label: "Campus Feed", icon: Eye },
+        { key: "/profile", label: "Profile", icon: User },
+      ];
+    }
+    
+    // Student (default)
     return [
-      { key: "home", label: "Home", icon: HomeIcon },
-      { key: "report-issue", label: "Report Issue", icon: PlusSquareIcon },
-      { key: "community", label: "Community", icon: UsersIcon },
-      { key: "profile", label: "Profile", icon: UserIcon },
+      { key: "/", label: "Home", icon: Home },
+      { key: "/feed", label: "Campus Feed", icon: Users },
+      { key: "/report-issue", label: "Report Issue", icon: Plus },
+      { key: "/lost-found", label: "Lost & Found", icon: Search },
+      { key: "/complaints", label: "Complaints", icon: AlertTriangle },
+      { key: "/profile", label: "Profile", icon: User },
     ];
   }, [role]);
 
   const currentActiveKey =
     activeKey ||
-    (typeof window !== "undefined"
-      ? items.find((i) => window.location.pathname.includes(i.key))?.key
-      : items[0]?.key);
+    items.find((i) => location.pathname === i.key)?.key ||
+    items[0]?.key;
+
+  const getRoleBadge = () => {
+    if (role === "admin") return { letter: "A", bg: "bg-red-500", label: "Admin" };
+    if (role === "caretaker") return { letter: "C", bg: "bg-purple-500", label: "Caretaker" };
+    return { letter: "S", bg: "bg-[#00BCD4]", label: "Student" };
+  };
+
+  const roleBadge = getRoleBadge();
 
   const SidebarContent = ({ isMobile }) => {
     const widthClass = isMobile ? "w-72" : collapsed ? "w-20" : "w-64";
@@ -39,28 +70,29 @@ export function Sidebar({
         className={[
           "bg-white border-r border-[#E0E0E0]",
           "flex flex-col flex-shrink-0",
-          "min-h-[calc(100vh-56px)]", // 🔥 FULL HEIGHT FIX
+          "min-h-[calc(100vh-56px)]",
           "transition-[width] duration-200 ease-in-out",
           widthClass,
         ].join(" ")}
       >
         {/* Header */}
         <div className="h-14 px-3 flex items-center justify-between border-b border-[#E0E0E0]">
-          <div className="h-9 w-9 rounded-xl bg-[#E0F7FA] flex items-center justify-center text-[#00BCD4] font-semibold">
-            {role === "admin" ? "A" : "U"}
+          <div className="flex items-center gap-3">
+            <div className={`h-9 w-9 rounded-xl ${roleBadge.bg} flex items-center justify-center text-white font-semibold shadow-lg`}>
+              {roleBadge.letter}
+            </div>
+            {!collapsed && !isMobile && (
+              <span className="text-sm font-semibold text-gray-700">{roleBadge.label}</span>
+            )}
           </div>
 
           {!isMobile && (
             <button
               onClick={onToggleCollapse}
-              className="hidden md:inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[#F5F5F5]"
+              className="hidden md:inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[#F5F5F5] transition-colors"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  fill="none"
-                  strokeWidth="2"
-                  d={collapsed ? "M9 18l6-6-6-6" : "M15 18l-6-6 6-6"}
-                />
+              <svg width="20" height="20" viewBox="0 0 24 24" stroke="currentColor" fill="none" strokeWidth="2">
+                <path d={collapsed ? "M9 18l6-6-6-6" : "M15 18l-6-6 6-6"} />
               </svg>
             </button>
           )}
@@ -68,7 +100,7 @@ export function Sidebar({
           {isMobile && (
             <button
               onClick={onClose}
-              className="h-9 w-9 rounded-lg hover:bg-[#F5F5F5]"
+              className="h-9 w-9 rounded-lg hover:bg-[#F5F5F5] flex items-center justify-center"
             >
               ✕
             </button>
@@ -76,7 +108,7 @@ export function Sidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="p-3 space-y-1">
+        <nav className="p-3 space-y-1 flex-1">
           {items.map((item) => {
             const Icon = item.icon;
             const active = item.key === currentActiveKey;
@@ -87,15 +119,15 @@ export function Sidebar({
                 onClick={() => onNavigate?.(item.key)}
                 className={[
                   "w-full flex items-center gap-3 px-3 py-3 rounded-xl",
-                  "transition-all",
+                  "transition-all duration-200",
                   active
-                    ? "bg-[#E0F7FA] text-[#00BCD4]"
-                    : "text-[#616161] hover:bg-[#E0F7FA]",
+                    ? "bg-[#E0F7FA] text-[#00BCD4] shadow-sm"
+                    : "text-[#616161] hover:bg-[#F5F5F5]",
                 ].join(" ")}
               >
-                <Icon />
+                <Icon size={22} strokeWidth={active ? 2.5 : 2} />
                 {!collapsed && (
-                  <span className="text-sm font-semibold">
+                  <span className={`text-sm ${active ? "font-semibold" : "font-medium"}`}>
                     {item.label}
                   </span>
                 )}
@@ -104,18 +136,26 @@ export function Sidebar({
           })}
         </nav>
 
-        {/* Tip at Bottom */}
+        {/* Tips Section */}
         {!collapsed && (
-          <div className="mt-auto p-3">
-            <div className="rounded-2xl bg-[#F0FEFF] border border-[#E0F7FA] p-4">
-              <div className="text-xs font-bold uppercase text-[#9E9E9E]">
-                Tip
+          <div className="p-3 mt-auto">
+            <div className="rounded-2xl bg-gradient-to-br from-[#F0FEFF] to-[#E0F7FA] border border-[#B2EBF2] p-4">
+              <div className="text-[10px] font-bold uppercase text-[#00838F] tracking-wider mb-2">
+                {role === "admin" ? "Admin Tip" : role === "caretaker" ? "Caretaker Tip" : "Quick Tip"}
               </div>
-              <div className="text-sm font-semibold mt-1">
-                Keep issues detailed
+              <div className="text-sm font-medium text-gray-800 mb-1">
+                {role === "admin" 
+                  ? "Review pending cases" 
+                  : role === "caretaker" 
+                  ? "Update task status" 
+                  : "Add photos to reports"}
               </div>
-              <div className="text-sm text-[#616161] mt-1">
-                Add photos and exact location for faster resolution.
+              <div className="text-xs text-[#546E7A]">
+                {role === "admin"
+                  ? "Assign issues to caretakers for faster resolution."
+                  : role === "caretaker"
+                  ? "Keep students updated on progress."
+                  : "Photos help resolve issues 2x faster."}
               </div>
             </div>
           </div>
@@ -131,20 +171,23 @@ export function Sidebar({
         <SidebarContent isMobile={false} />
       </div>
 
-      {/* Mobile */}
+      {/* Mobile Overlay */}
       <div
         className={`md:hidden fixed inset-0 z-50 ${
           mobileOpen ? "pointer-events-auto" : "pointer-events-none"
         }`}
       >
+        {/* Backdrop */}
         <div
-          className={`absolute inset-0 bg-black/50 ${
+          className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
             mobileOpen ? "opacity-100" : "opacity-0"
           }`}
           onClick={onClose}
         />
+        
+        {/* Sidebar Panel */}
         <div
-          className={`absolute left-0 top-0 h-full transition-transform ${
+          className={`absolute left-0 top-0 h-full transition-transform duration-300 ${
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -154,19 +197,3 @@ export function Sidebar({
     </>
   );
 }
-
-/* Icons */
-function baseIcon(d) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d={d} />
-    </svg>
-  );
-}
-const HomeIcon = () => baseIcon("M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z");
-const DashboardIcon = () => baseIcon("M3 13h8V3H3zM13 21h8V11h-8z");
-const IssuesIcon = () => baseIcon("M8 7h8M8 12h8M8 17h5");
-const MegaphoneIcon = () => baseIcon("M4 11v2l10 2V9z");
-const PlusSquareIcon = () => baseIcon("M12 8v8M8 12h8");
-const UsersIcon = () => baseIcon("M17 21v-2a4 4 0 0 0-4-4H6");
-const UserIcon = () => baseIcon("M12 11a4 4 0 1 0 0-8");

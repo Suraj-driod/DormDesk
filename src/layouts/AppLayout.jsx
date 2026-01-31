@@ -32,13 +32,21 @@ const AppLayout = () => {
     navigate(path);
   };
 
+  /* ----------------------------------------
+     Logout handler with navigation
+  -----------------------------------------*/
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FA]">
       {/* ---------------- Navbar ---------------- */}
       <Navbar
         appName="DormDesk"
         user={profile}
-        onLogout={logout}
+        onLogout={handleLogout}
         onMenuClick={() => setMobileOpen(true)}
       />
 
