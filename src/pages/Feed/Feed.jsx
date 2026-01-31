@@ -14,6 +14,7 @@ import {
 import PostBase from "../../components/core/PostBase/PostBase";
 import { SelectBetter } from "../../UI/SelectBetter";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
 import { useAuth } from "../../auth/AuthContext";
 import { fetchIssuesForFeed } from "../../Services/issues.service";
 import { fetchAnnouncements } from "../../Services/announcements.service";
@@ -378,18 +379,17 @@ const Feed = () => {
                         : navigate(`/feed/post/${tabToPostType(activeTab)}/${post.id}`)
                     }
                     currentStatus={<BadgeBetter1 status={post.status} />}
-                    statusTimeline={[
-                      {
-                        label: "Posted",
-                        timestamp: post.timestamp.toLocaleDateString(),
-                        active: true,
-                      },
-                      {
-                        label: post.status,
-                        timestamp: "Current",
-                        active: true,
-                      },
-                    ]}
+                    statusTimeline={
+                      activeTab === "issues"
+                        ? getStatusTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                        : activeTab === "announcements"
+                          ? getAnnouncementTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                          : activeTab === "lost"
+                            ? getLostItemTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                            : activeTab === "complaints"
+                              ? getComplaintTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                              : [{ label: "Posted", timestamp: post.timestamp?.toLocaleDateString?.(), active: true }, { label: post.status, timestamp: "Current", active: true }]
+                    }
                     extras={
                       post.repostCount > 0 && (
                         <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">

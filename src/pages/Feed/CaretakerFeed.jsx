@@ -16,6 +16,7 @@ import { db } from "../../firebase";
 import PostBase from "../../components/core/PostBase/PostBase";
 import { SelectBetter } from "../../UI/SelectBetter";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
 import { useAuth } from "../../auth/AuthContext";
 
 const SORT_OPTIONS = [
@@ -327,18 +328,17 @@ const CaretakerFeed = () => {
                     onCommentClick={activeTab === "issues" ? () => navigate(`/feed/post/${post.id}`) : undefined}
                     onPostClick={activeTab === "issues" ? () => navigate(`/feed/post/${post.id}`) : undefined}
                     currentStatus={<BadgeBetter1 status={post.status} />}
-                    statusTimeline={[
-                      {
-                        label: "Posted",
-                        timestamp: post.timestamp.toLocaleDateString(),
-                        active: true,
-                      },
-                      {
-                        label: post.status,
-                        timestamp: "Current",
-                        active: true,
-                      },
-                    ]}
+                    statusTimeline={
+                      activeTab === "issues"
+                        ? getStatusTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                        : activeTab === "announcements"
+                          ? getAnnouncementTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                          : activeTab === "lost"
+                            ? getLostItemTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                            : activeTab === "complaints"
+                              ? getComplaintTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
+                              : [{ label: "Posted", timestamp: post.timestamp?.toLocaleDateString?.(), active: true }, { label: post.status, timestamp: "Current", active: true }]
+                    }
                     hideActions
                   />
                 </motion.div>

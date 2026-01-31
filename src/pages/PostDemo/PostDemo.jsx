@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PostBase, PostDetailBase } from '../../components/core';
 import { BadgeBetter1 } from '../../UI/BadgeBetter';
+import { getStatusTimeline } from '../../utils/statusTimeline';
 import { isValidElement } from 'react';
 
 const PostDemo = () => {
@@ -10,14 +11,6 @@ const PostDemo = () => {
   const handleUpvote = (postId) => {
     setUpvoted(prev => ({ ...prev, [postId]: !prev[postId] }));
   };
-
-  const sampleTimeline = [
-    { label: 'Reported', timestamp: 'Jan 28, 2026 10:30 AM', active: true },
-    { label: 'Assigned', timestamp: 'Jan 28, 2026 11:00 AM', active: true },
-    { label: 'In Progress', timestamp: 'Jan 28, 2026 2:45 PM', active: true },
-    { label: 'Resolved', timestamp: null, active: false },
-    { label: 'Closed', timestamp: null, active: false },
-  ];
 
   const sampleComments = [
     {
@@ -74,9 +67,8 @@ const PostDemo = () => {
       timestamp: new Date('2026-01-28T10:30:00'),
       content: 'There\'s been a persistent water leakage from the bathroom ceiling for the past 3 days. The maintenance team was informed but no action has been taken yet. This is causing water damage to the floor and potential mold growth.',
       visibility: 'public',
-      // Replaced string with BadgeBetter1 (Mapped 'In Progress' -> 'InProgress')
       currentStatus: <BadgeBetter1 status="InProgress" />,
-      statusTimeline: sampleTimeline,
+      statusTimeline: getStatusTimeline('in_progress', { timestamp: 'Jan 28, 2026 2:45 PM' }),
       upvoteCount: 24,
       commentCount: 12,
     },
@@ -177,14 +169,8 @@ const PostDemo = () => {
           timestamp={new Date('2026-01-25T16:45:00')}
           content="The ongoing construction work near the dormitory is extremely disruptive, especially during exam period. Request to restrict heavy machinery operation between 8 AM - 6 PM on weekdays."
           visibility="public"
-          // Replaced string with BadgeBetter1 (Mapped 'Under Review' -> 'InProgress' for Yellow)
           currentStatus={<BadgeBetter1 status="InProgress" />}
-          statusTimeline={[
-            { label: 'Reported', timestamp: 'Jan 25, 2026 4:45 PM', active: true },
-            { label: 'Under Review', timestamp: 'Jan 26, 2026 9:00 AM', active: true },
-            { label: 'Action Taken', timestamp: null, active: false },
-            { label: 'Closed', timestamp: null, active: false },
-          ]}
+          statusTimeline={getStatusTimeline('in_progress', { timestamp: 'Jan 26, 2026 9:00 AM' })}
           footerSlot={
             <div className="flex items-center gap-2 text-xs text-gray-500">
               <span className="px-2 py-1 bg-gray-100 rounded">Noise Complaint</span>
@@ -201,15 +187,8 @@ const PostDemo = () => {
           author="Tech Support"
           timestamp={new Date('2026-01-23T08:15:00')}
           visibility="public"
-          // Replaced string with BadgeBetter1
           currentStatus={<BadgeBetter1 status="Resolved" />}
-          statusTimeline={[
-            { label: 'Reported', timestamp: 'Jan 23, 2026 8:15 AM', active: true },
-            { label: 'Assigned', timestamp: 'Jan 23, 2026 8:30 AM', active: true },
-            { label: 'In Progress', timestamp: 'Jan 23, 2026 9:00 AM', active: true },
-            { label: 'Resolved', timestamp: 'Jan 23, 2026 11:30 AM', active: true },
-            { label: 'Closed', timestamp: 'Jan 23, 2026 12:00 PM', active: true },
-          ]}
+          statusTimeline={getStatusTimeline('resolved', { timestamp: 'Jan 23, 2026 11:30 AM' })}
           upvoteCount={234}
           commentCount={67}
         >

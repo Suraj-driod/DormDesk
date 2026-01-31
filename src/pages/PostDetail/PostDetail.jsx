@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import PostDetailBase from "../../components/core/PostDetailBase/PostDetailBase";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
 import { useAuth } from "../../auth/AuthContext";
 import { fetchIssueById } from "../../Services/issues.service";
 import { fetchAnnouncementById } from "../../Services/announcements.service";
@@ -157,10 +158,7 @@ const PostDetail = () => {
         isUpvoted: voted,
         onUpvote: handleUpvote,
         currentStatus: issue.status ? <BadgeBetter1 status={issue.status} /> : null,
-        statusTimeline: [
-          { label: "Posted", timestamp: issue.created_at ? new Date(issue.created_at).toLocaleDateString() : "", active: true },
-          { label: issue.status || "Current", timestamp: "Current", active: true },
-        ],
+        statusTimeline: getStatusTimeline(issue.status, { timestamp: issue.created_at ? new Date(issue.created_at).toLocaleDateString() : "" }),
       };
     }
     if (postEntity && POST_TYPES.includes(type)) {
@@ -180,10 +178,17 @@ const PostDetail = () => {
         isUpvoted: voted,
         onUpvote: handleUpvote,
         currentStatus: <BadgeBetter1 status={status} />,
-        statusTimeline: [
-          { label: "Posted", timestamp: e.created_at ? new Date(e.created_at).toLocaleDateString() : "", active: true },
-          { label: status, timestamp: "Current", active: true },
-        ],
+        statusTimeline:
+          type === "announcement"
+            ? getAnnouncementTimeline(status, { timestamp: e.created_at ? new Date(e.created_at).toLocaleDateString() : "" })
+            : type === "lost_found"
+              ? getLostItemTimeline(status, { timestamp: e.created_at ? new Date(e.created_at).toLocaleDateString() : "" })
+              : type === "complaint"
+                ? getComplaintTimeline(status, { timestamp: e.created_at ? new Date(e.created_at).toLocaleDateString() : "" })
+                : [
+                    { label: "Posted", timestamp: e.created_at ? new Date(e.created_at).toLocaleDateString() : "", active: true },
+                    { label: status, timestamp: "Current", active: true },
+                  ],
       };
     }
     return null;

@@ -88,14 +88,23 @@ const PostBase = ({
     if (normalizedLabel.includes('assigned')) {
       return { dot: 'bg-blue-500', text: 'text-blue-600', line: 'bg-blue-300' };
     }
-    if (normalizedLabel.includes('progress') || normalizedLabel.includes('review')) {
+    if (normalizedLabel.includes('progress') || normalizedLabel.includes('in_progress') || normalizedLabel.includes('review')) {
       return { dot: 'bg-amber-500', text: 'text-amber-600', line: 'bg-amber-300' };
     }
-    if (normalizedLabel.includes('resolved')) {
+    if (normalizedLabel.includes('resolved') || normalizedLabel.includes('claimed')) {
       return { dot: 'bg-green-500', text: 'text-green-600', line: 'bg-green-300' };
     }
-    if (normalizedLabel.includes('closed') || normalizedLabel.includes('claimed')) {
+    if (normalizedLabel.includes('closed')) {
       return { dot: 'bg-gray-500', text: 'text-gray-600', line: 'bg-gray-300' };
+    }
+    if (normalizedLabel.includes('published') || normalizedLabel.includes('draft')) {
+      return { dot: normalizedLabel.includes('published') ? 'bg-[#00B8D4]' : 'bg-gray-400', text: normalizedLabel.includes('published') ? 'text-[#00838F]' : 'text-gray-500', line: normalizedLabel.includes('published') ? 'bg-[#00E5FF]/50' : 'bg-gray-300' };
+    }
+    if (normalizedLabel.includes('lost')) return { dot: 'bg-amber-500', text: 'text-amber-600', line: 'bg-amber-300' };
+    if (normalizedLabel.includes('found')) return { dot: 'bg-green-500', text: 'text-green-600', line: 'bg-green-300' };
+    if (normalizedLabel.includes('submitted')) return { dot: 'bg-blue-500', text: 'text-blue-600', line: 'bg-blue-300' };
+    if (normalizedLabel.includes('under_review') || normalizedLabel.includes('under review')) {
+      return { dot: 'bg-amber-500', text: 'text-amber-600', line: 'bg-amber-300' };
     }
     return { dot: 'bg-[#00E5FF]', text: 'text-[#00B8D4]', line: 'bg-[#00E5FF]/50' };
   };

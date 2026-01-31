@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Search, Lock, Globe, FileText, Loader2 } from "lucide-react"; 
 import { PostBase } from "../../components/core";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
+import { getStatusTimeline } from "../../utils/statusTimeline";
 import { SelectBetter } from "../../UI/SelectBetter"; 
 
 // --- Import the Backend Hook ---
@@ -137,10 +138,7 @@ const Issues = () => {
                       onCommentClick={() => navigate(`/feed/post/${issue.id}`)}
                       onPostClick={() => navigate(`/feed/post/${issue.id}`)}
                       currentStatus={<BadgeBetter1 status={issue.status} />}
-                      statusTimeline={[
-                        { label: "Reported", timestamp: "Created", active: true },
-                        { label: issue.status, timestamp: "Current", active: true },
-                      ]}
+                      statusTimeline={getStatusTimeline(issue.status)}
                     />
                   </motion.div>
                 ))
