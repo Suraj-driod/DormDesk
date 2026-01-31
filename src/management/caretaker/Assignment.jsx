@@ -51,7 +51,7 @@ const Assignment = () => {
   const [blockFilter, setBlockFilter] = useState("All");
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.uid) {
       loadAssignments();
     }
   }, [user]);
@@ -59,7 +59,7 @@ const Assignment = () => {
   const loadAssignments = async () => {
     setLoading(true);
     try {
-      const data = await fetchAssignedIssues(user.id);
+      const data = await fetchAssignedIssues(user.uid);
       setAssignments(data || []);
     } catch (error) {
       console.error("Error loading assignments:", error);
@@ -91,7 +91,7 @@ const Assignment = () => {
     if (newStatus === 'resolved' && !window.confirm("Mark this job as completed?")) return;
     
     try {
-      await updateIssueStatus(id, newStatus, user?.id);
+      await updateIssueStatus(id, newStatus, user?.uid);
       setAssignments(prev => prev.map(item => 
         item.id === id ? { ...item, status: newStatus } : item
       ));
@@ -105,7 +105,7 @@ const Assignment = () => {
     const reason = prompt("Enter reason for rejecting this assignment:");
     if (reason) {
       try {
-        await updateIssueStatus(id, 'reported', user?.id, `Rejected: ${reason}`);
+        await updateIssueStatus(id, 'reported', user?.uid, `Rejected: ${reason}`);
         setAssignments(prev => prev.filter(item => item.id !== id));
         showSuccess("Assignment rejected and returned to queue.");
       } catch (err) {

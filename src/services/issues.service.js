@@ -201,14 +201,13 @@ export const updateIssueStatus = async (id, status, changedBy, note = null) => {
 
   await updateDoc(issueRef, updateData);
 
-  // Log status change
   const logsRef = collection(db, "issue_status_logs");
   await addDoc(logsRef, {
     issue_id: id,
     old_status: currentIssue.status,
     new_status: status,
-    changed_by: changedBy,
-    note,
+    changed_by: changedBy ?? null,
+    note: note ?? null,
     changed_at: new Date().toISOString(),
   });
 
