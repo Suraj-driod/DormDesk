@@ -241,47 +241,65 @@ const CaretakerFeed = () => {
   return (
     <div className="min-h-screen bg-[#F8F9FA] font-['Poppins',sans-serif]">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 py-5">
-          <div className="flex items-center gap-3 mb-2">
-            <Eye size={24} className="text-purple-500" />
-            <h1 className="text-3xl font-bold text-gray-800">Campus Feed</h1>
-          </div>
-          <p className="text-gray-500 text-sm">
-            View-only mode for caretakers - Stay updated with campus happenings
-          </p>
+      {/* Glowy Caretaker Feed Bar */}
+<div className="sticky top-0 z-30 bg-transparent">
+  <div className="max-w-5xl mx-auto px-4 py-5 flex justify-center">
+    <div
+      className="
+        flex gap-2 px-3 py-2 rounded-2xl
+        bg-[#F6F0FF]
+        border border-[#E6D9FF]
+        shadow-[0_0_35px_rgba(168,85,247,0.35)]
+      "
+    >
+      {TABS.map((tab) => {
+        const Icon = tab.icon;
+        const active = activeTab === tab.id;
 
-          {/* Tabs */}
-          <div className="mt-6 overflow-x-auto">
-            <div className="flex gap-2 min-w-max">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`relative px-5 py-3 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all
-                    ${
-                      activeTab === tab.id
-                        ? "text-purple-600"
-                        : "text-gray-500 hover:bg-gray-100"
-                    }
-                  `}
-                >
-                  {activeTab === tab.id && (
-                    <motion.div
-                      layoutId="caretakerFeedTab"
-                      className="absolute inset-0 bg-purple-50 rounded-xl"
-                    />
-                  )}
-                  <span className="relative z-10 flex items-center gap-2">
-                    <tab.icon size={18} />
-                    {tab.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setActiveTab(tab.id);
+            }}
+            className={`
+              relative flex items-center gap-2
+              px-5 py-3 rounded-xl
+              text-sm font-bold
+              transition-all duration-300
+              ${
+                active
+                  ? "text-purple-700"
+                  : "text-gray-500 hover:text-gray-800"
+              }
+            `}
+          >
+            {active && (
+              <motion.div
+                layoutId="caretakerFeedGlow"
+                className="
+                  pointer-events-none
+                  absolute inset-0 rounded-xl
+                  bg-gradient-to-r from-purple-300 to-white
+                  shadow-[0_0_30px_rgba(168,85,247,0.65)]
+                "
+              />
+            )}
+
+            <span className="relative z-10 flex items-center gap-2">
+              <Icon size={18} strokeWidth={active ? 2.6 : 2} />
+              {tab.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+</div>
+
 
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 py-6">
