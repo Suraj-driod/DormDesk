@@ -231,8 +231,10 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-6 w-full h-[160px] relative rounded-[26px] bg-white/70 backdrop-blur-lg border border-[#7CF3FF]/50 shadow-[0_0_35px_rgba(0,229,255,0.25)] flex items-center justify-center overflow-hidden"
+          className="mb-6 w-full h-[160px] relative rounded-[26px] border border-[#7CF3FF]/50 shadow-[0_0_35px_rgba(0,229,255,0.25)] flex items-center justify-center overflow-hidden bg-cover bg-center"
+          style={{ backgroundImage: 'url(/slideshow-bg.png)' }}
         >
+          <div className="absolute inset-0 z-0 bg-white/40 backdrop-blur-[2px]" aria-hidden />
           {/* Navigation Arrows */}
           <button
             onClick={() => setCurrentSlide(prev => prev === 0 ? slides.length - 1 : prev - 1)}
@@ -257,7 +259,7 @@ export default function Dashboard() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
-                className="text-center px-12 cursor-pointer"
+                className="relative z-10 text-center px-12 cursor-pointer"
                 onClick={() => slides[currentSlide]?.path && navigate(slides[currentSlide].path)}
               >
                 <div className="mx-auto mb-3 w-12 h-12 rounded-full bg-[#E6FBFF] flex items-center justify-center shadow-[0_0_15px_rgba(0,229,255,0.4)]">
@@ -277,7 +279,7 @@ export default function Dashboard() {
           </AnimatePresence>
 
           {/* Dots Indicator */}
-          <div className="absolute bottom-4 flex gap-2">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2">
             {slides.map((_, index) => (
               <button
                 key={index}

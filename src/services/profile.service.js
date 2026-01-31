@@ -13,18 +13,22 @@ import { db } from "../firebase";
 // Fetch user profile - accepts userId (uid) and optionally email for management lookup
 export const fetchUserProfile = async (userId, userEmail = null) => {
   try {
-    // If email provided, check management collection first (document ID = email)
+    // If email provided, check management collection (same lookup as AuthContext: by email field)
     if (userEmail) {
-      const mgmtRef = doc(db, "management", userEmail);
-      const mgmtSnap = await getDoc(mgmtRef);
+      const mgmtRef = collection(db, "management");
+      const q = query(mgmtRef, where("email", "==", userEmail));
+      const mgmtSnap = await getDocs(q);
 
-      if (mgmtSnap.exists()) {
-        const mgmtData = mgmtSnap.data();
-        if (mgmtData.isActive === true) {
+      if (!mgmtSnap.empty) {
+        const mgmtDoc = mgmtSnap.docs[0];
+        const mgmtData = mgmtDoc.data();
+        const isActiveVal = mgmtData.isActive ?? mgmtData.is_active ?? mgmtData.active;
+        const isActive = isActiveVal === true || isActiveVal === "true";
+        if (isActive) {
           return {
             id: userId,
             email: userEmail,
-            managementDocId: userEmail,
+            managementDocId: mgmtDoc.id,
             ...mgmtData,
             role: mgmtData.role,
             name: mgmtData.full_name || mgmtData.name,
@@ -58,10 +62,11 @@ export const fetchUserProfile = async (userId, userEmail = null) => {
   }
 };
 
-// Get user statistics based on role
+// Get user statistics based on role (role normalized to lowercase)
 export const getUserStats = async (userId, role) => {
+  const r = (role || "").toLowerCase();
   try {
-    if (role === "student") {
+    if (r === "student") {
       const issuesRef = collection(db, "issues");
       const q = query(issuesRef, where("created_by", "==", userId));
       const snapshot = await getDocs(q);
@@ -77,7 +82,7 @@ export const getUserStats = async (userId, role) => {
       return { reported, resolved, pending };
     }
 
-    if (role === "caretaker") {
+    if (r === "caretaker") {
       const issuesRef = collection(db, "issues");
       const q = query(issuesRef, where("assigned_to", "==", userId));
       const snapshot = await getDocs(q);
@@ -93,7 +98,7 @@ export const getUserStats = async (userId, role) => {
       return { assigned, completed, inProgress };
     }
 
-    if (role === "admin") {
+    if (r === "admin" || r === "administrator") {
       const [issuesSnap, announcementsSnap, complaintsSnap] = await Promise.all([
         getDocs(collection(db, "issues")),
         getDocs(collection(db, "announcements")),
@@ -121,20 +126,19 @@ export const getUserStats = async (userId, role) => {
 };
 
 // Update user profile
-// For management (admin/caretaker): use email as document ID
-// For students: use userId (uid) as document ID
+// For management: resolve doc by email query; for students: doc ID = userId
 export const updateUserProfile = async (userId, updateData, role, userEmail = null) => {
   try {
     let docRef;
-    
-    if ((role === "admin" || role === "caretaker") && userEmail) {
-      // Management uses email as document ID
-      docRef = doc(db, "management", userEmail);
+    const r = (role || "").toLowerCase();
+    if ((r === "admin" || r === "caretaker" || r === "administrator") && userEmail) {
+      const q = query(collection(db, "management"), where("email", "==", userEmail));
+      const snap = await getDocs(q);
+      if (snap.empty) throw new Error("Management profile not found");
+      docRef = doc(db, "management", snap.docs[0].id);
     } else {
-      // Students use uid as document ID
       docRef = doc(db, "users", userId);
     }
-    
     await updateDoc(docRef, {
       ...updateData,
       updated_at: new Date().toISOString(),
@@ -169,9 +173,12 @@ export const createProfile = async (userId, profileData) => {
 export const updateAvatarUrl = async (userId, avatarUrl, role, userEmail = null) => {
   try {
     let docRef;
-    
-    if ((role === "admin" || role === "caretaker") && userEmail) {
-      docRef = doc(db, "management", userEmail);
+    const r = (role || "").toLowerCase();
+    if ((r === "admin" || r === "caretaker" || r === "administrator") && userEmail) {
+      const q = query(collection(db, "management"), where("email", "==", userEmail));
+      const snap = await getDocs(q);
+      if (snap.empty) throw new Error("Management profile not found");
+      docRef = doc(db, "management", snap.docs[0].id);
     } else {
       docRef = doc(db, "users", userId);
     }

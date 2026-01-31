@@ -74,11 +74,10 @@ const AdminCases = () => {
 
   const filteredCases = useMemo(() => {
     return cases.filter(item => {
-      // Tab logic
       if (activeTab === "pending") {
-        if (item.assigned_to !== null) return false;
+        if (item.status !== "reported") return false;
       } else {
-        if (item.assigned_to === null) return false;
+        if (item.status === "reported") return false;
       }
 
       // Search
