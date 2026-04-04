@@ -28,7 +28,7 @@ const TARGET_BLOCKS = [
 ];
 
 const AdminAnnouncement = () => {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, profile } = useAuth();
   const [imagePreview, setImagePreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
@@ -102,7 +102,7 @@ const AdminAnnouncement = () => {
         target_block: data.targetBlock,
         image_url: imageUrl,
         poll_data: pollDataJSON,
-      }, user.uid);
+      }, user.uid, profile?.hostelId);
 
       setSubmitSuccess(true);
       setTimeout(() => setSubmitSuccess(false), 3000);

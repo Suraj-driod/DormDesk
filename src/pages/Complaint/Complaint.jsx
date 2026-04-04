@@ -15,7 +15,7 @@ const COMPLAINT_TYPES = [
 ];
 
 const Complaint = () => {
-  const { user } = useAuth(); 
+  const { user, profile } = useAuth(); 
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -68,7 +68,7 @@ const Complaint = () => {
         description: data.description,
         accused_user: data.accusedName,
         media_url: mediaUrl,
-      }, user.uid);
+      }, user.uid, profile?.hostelId);
 
       showSuccess('Complaint submitted successfully!', {
         onClose: () => {

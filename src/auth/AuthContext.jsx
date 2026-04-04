@@ -1,12 +1,27 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { 
-  onAuthStateChanged, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
-  updateProfile 
+  updateProfile,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 import { auth, db } from "../firebase";
 
 const AuthContext = createContext(null);
@@ -20,37 +35,30 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const isMountedRef = useRef(true);
 
-  // Fetch user profile - default to student, only checks management if requested
-  const fetchProfile = useCallback(async (firebaseUser, checkManagement = false) => {
+  // Fetch user profile - checks both management and users collections for role
+  const fetchProfile = useCallback(async (firebaseUser) => {
     if (!firebaseUser) return null;
 
     const userId = firebaseUser.uid;
     const userEmail = firebaseUser.email;
 
     try {
-      // Only check management collection if explicitly requested (staff login)
-      if (checkManagement && userEmail) {
-        console.log("Staff login check for:", userEmail);
-        
-        // Query management collection by email field (not document ID)
+      // Always check management collection first (for staff accounts)
+      if (userEmail) {
         const mgmtRef = collection(db, "management");
         const q = query(mgmtRef, where("email", "==", userEmail));
         const mgmtSnap = await getDocs(q);
 
-        console.log("Documents found:", mgmtSnap.size);
-
         if (!mgmtSnap.empty) {
           const mgmtDoc = mgmtSnap.docs[0];
           const mgmtData = mgmtDoc.data();
-          console.log("Management data:", mgmtData);
-          
+
           // Check for various field name conventions (isActive, is_active, active)
           // Also handle string "true" vs boolean true
-          const isActiveValue = mgmtData.isActive ?? mgmtData.is_active ?? mgmtData.active;
+          const isActiveValue =
+            mgmtData.isActive ?? mgmtData.is_active ?? mgmtData.active;
           const isActive = isActiveValue === true || isActiveValue === "true";
-          
-          console.log("isActive value:", isActiveValue, "parsed as:", isActive);
-          
+
           if (isActive) {
             return {
               id: userId,
@@ -58,18 +66,19 @@ export const AuthProvider = ({ children }) => {
               managementDocId: mgmtDoc.id,
               ...mgmtData,
               role: mgmtData.role, // "admin" or "caretaker"
-              name: mgmtData.full_name || mgmtData.name || userEmail.split("@")[0],
-              hostel: mgmtData.hostel_block || mgmtData.hostel,
+              name:
+                mgmtData.full_name || mgmtData.name || userEmail.split("@")[0],
+              hostelId: mgmtData.hostelId || null,
             };
           }
-          // isActive is false - not authorized as staff
-          throw new Error("Your staff account is not active. Contact administrator.");
+          // Staff account exists but is not active - deny access
+          throw new Error(
+            "Your staff account is not active. Please contact your administrator.",
+          );
         }
-        // Email not in management - not authorized as staff
-        throw new Error(`Email "${userEmail}" not found in management collection.`);
       }
 
-      // Check users collection by UID (for students)
+      // Not in management collection, check users collection (student)
       const userRef = doc(db, "users", userId);
       const userSnap = await getDoc(userRef);
 
@@ -80,6 +89,7 @@ export const AuthProvider = ({ children }) => {
           email: userEmail,
           ...userData,
           role: "student",
+          hostelId: userData.hostelId || null,
         };
       }
 
@@ -92,7 +102,7 @@ export const AuthProvider = ({ children }) => {
       };
     } catch (error) {
       console.error("Error fetching profile:", error);
-      throw error; // Re-throw to handle in login
+      throw error; // Re-throw to handle in caller
     }
   }, []);
 
@@ -122,17 +132,24 @@ export const AuthProvider = ({ children }) => {
       setUser(currentUser);
 
       if (currentUser) {
-        // On page reload, check if user was previously a staff member
-        // by looking at localStorage flag
-        const wasStaffLogin = localStorage.getItem(`staff_${currentUser.uid}`) === "true";
         try {
-          const userProfile = await fetchProfile(currentUser, wasStaffLogin);
+          // Always resolve role from Firestore (server-side role resolution)
+          const userProfile = await fetchProfile(currentUser);
           if (isMountedRef.current) setProfile(userProfile);
-        } catch {
-          // If staff check fails on reload, clear flag and treat as student
-          localStorage.removeItem(`staff_${currentUser.uid}`);
-          const studentProfile = await fetchProfile(currentUser, false);
-          if (isMountedRef.current) setProfile(studentProfile);
+        } catch (profileError) {
+          // If profile fetch fails, still set a basic user state but log the error
+          console.error(
+            "Failed to fetch profile on auth state change:",
+            profileError,
+          );
+          if (isMountedRef.current) {
+            setProfile({
+              id: currentUser.uid,
+              email: currentUser.email,
+              name: currentUser.displayName || currentUser.email?.split("@")[0],
+              role: "student",
+            });
+          }
         }
       } else {
         setProfile(null);
@@ -156,48 +173,58 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user, fetchProfile]);
 
-  // Login - pass isStaffLogin=true to check management collection
-  const login = async (email, password, isStaffLogin = false) => {
+  // Login - role is always resolved from Firestore (server-side)
+  const login = async (email, password) => {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       if (result.user) {
         try {
-          const userProfile = await fetchProfile(result.user, isStaffLogin);
+          // Fetch profile and resolve role from Firestore
+          const userProfile = await fetchProfile(result.user);
           setProfile(userProfile);
-          
-          // Remember staff login for session persistence
-          if (isStaffLogin && (userProfile.role === "admin" || userProfile.role === "caretaker")) {
-            localStorage.setItem(`staff_${result.user.uid}`, "true");
-          } else {
-            localStorage.removeItem(`staff_${result.user.uid}`);
-          }
+          return { data: result, error: null };
         } catch (profileError) {
-          // If staff login fails validation, sign out and return error
-          if (isStaffLogin) {
-            await signOut(auth);
-            return { data: null, error: { message: profileError.message } };
-          }
-          // For regular login, just set basic profile
-          setProfile({
-            id: result.user.uid,
-            email: result.user.email,
-            name: result.user.displayName || email.split("@")[0],
-            role: "student",
-          });
+          // Profile fetch failed (e.g., staff account not active)
+          await signOut(auth);
+          return {
+            data: null,
+            error: { message: profileError.message },
+          };
         }
       }
       return { data: result, error: null };
     } catch (error) {
       console.error("Login error:", error);
-      return { data: null, error };
+
+      // Map Firebase auth errors to user-friendly messages
+      let userMessage = "Email and password don't match";
+
+      if (error.code === "auth/user-not-found") {
+        userMessage = "Email not found. Please register first.";
+      } else if (error.code === "auth/wrong-password") {
+        userMessage = "Incorrect password";
+      } else if (error.code === "auth/invalid-email") {
+        userMessage = "Invalid email address";
+      } else if (error.code === "auth/too-many-requests") {
+        userMessage = "Too many login attempts. Please try again later.";
+      }
+
+      return {
+        data: null,
+        error: { message: userMessage },
+      };
     }
   };
 
   // Sign Up - always creates student account (staff should already be in management)
   const signUp = async (email, password, metadata) => {
     try {
-      const result = await createUserWithEmailAndPassword(auth, email, password);
-      
+      const result = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+
       if (result.user) {
         // Update display name
         await updateProfile(result.user, {
@@ -210,7 +237,7 @@ export const AuthProvider = ({ children }) => {
           name: metadata?.fullName || email.split("@")[0],
           email: email,
           role: "student",
-          hostel: metadata?.hostel || null,
+          hostelId: metadata?.hostelId || null,
           block: metadata?.block || null,
           floor: metadata?.floor || null,
           room_no: metadata?.room_no || null,
@@ -218,8 +245,8 @@ export const AuthProvider = ({ children }) => {
           created_at: new Date().toISOString(),
         });
 
-        // Fetch profile as student (no management check on signup)
-        const userProfile = await fetchProfile(result.user, false);
+        // Fetch profile as student (role resolved from Firestore)
+        const userProfile = await fetchProfile(result.user);
         setProfile(userProfile);
       }
 
@@ -232,10 +259,6 @@ export const AuthProvider = ({ children }) => {
 
   // Logout
   const logout = async () => {
-    // Clear staff flag on logout
-    if (user?.uid) {
-      localStorage.removeItem(`staff_${user.uid}`);
-    }
     setProfile(null);
     return await signOut(auth);
   };

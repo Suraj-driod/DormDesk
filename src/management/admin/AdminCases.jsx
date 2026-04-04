@@ -31,7 +31,7 @@ const PriorityDot = ({ priority }) => {
 };
 
 const AdminCases = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [cases, setCases] = useState([]);
   const [caretakers, setCaretakers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +60,7 @@ const AdminCases = () => {
     setLoading(true);
     try {
       const [issuesData, caretakersData] = await Promise.all([
-        fetchIssues(),
+        fetchIssues({}, profile?.hostelId),
         fetchCaretakers(),
       ]);
       setCases(issuesData || []);

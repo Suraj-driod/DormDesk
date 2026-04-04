@@ -16,6 +16,13 @@ const ROLE_OPTIONS = [
   { value: 'student', label: 'Student' },
 ];
 
+const HOSTEL_OPTIONS = [
+  { value: 'hostel_boys_a', label: 'Boys Hostel A' },
+  { value: 'hostel_girls_b', label: 'Girls Hostel B' },
+  { value: 'hostel_boys_c', label: 'Boys Hostel C' },
+  { value: 'hostel_girls_d', label: 'Girls Hostel D' },
+];
+
 const Register = () => {
   const { signUp, user, loading } = useAuth();
   const navigate = useNavigate();
@@ -33,7 +40,7 @@ const Register = () => {
     phone: '',
     email: '',
     role: 'student',
-    hostelName: '',
+    hostelId: '',
     blockName: '',
     floor: '',
     roomNumber: '',
@@ -112,6 +119,7 @@ const Register = () => {
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
     if (!formData.role) newErrors.role = 'Please select a role';
+    if (!formData.hostelId) newErrors.hostelId = 'Please select a hostel';
     if (!formData.password) newErrors.password = 'Password is required';
     if (!idCardImage) newErrors.idCard = 'ID Card image is required';
 
@@ -127,7 +135,7 @@ const Register = () => {
         full_name: formData.fullName,
         phone: formData.phone,
         role: formData.role,
-        hostel_name: formData.hostelName,
+        hostelId: formData.hostelId,
         block_name: formData.blockName,
         floor: formData.floor,
         room_number: formData.roomNumber,
@@ -310,12 +318,15 @@ const Register = () => {
                 <section>
                   <h2 className="text-sm font-bold text-[#00B8D4] uppercase tracking-wide mb-4 pl-1">Hostel Details</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <TextInput
-                      label="Hostel Name"
-                      name="hostelName"
-                      placeholder="Enter hostel name"
-                      value={formData.hostelName}
+                    <SelectBetter
+                      label="Hostel"
+                      name="hostelId"
+                      placeholder="Select Hostel"
+                      options={HOSTEL_OPTIONS}
+                      value={formData.hostelId}
                       onChange={handleChange}
+                      error={errors.hostelId}
+                      required
                     />
                     <TextInput
                       label="Block Name / Number"

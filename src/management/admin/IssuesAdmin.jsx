@@ -55,7 +55,7 @@ const IssuesAdmin = () => {
   const loadIssues = async () => {
     setLoading(true);
     try {
-      const data = await fetchIssues();
+      const data = await fetchIssues({}, profile?.hostelId);
       setIssues(data || []);
     } catch (error) {
       console.error("Error loading issues:", error);

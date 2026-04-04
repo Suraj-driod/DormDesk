@@ -11,15 +11,17 @@ import {
   orderBy 
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { withHostelFilter } from "../Lib/utilities";
 
 const LOST_ITEMS_COLLECTION = "lost_found";
 
 // Fetch all lost items
-export const fetchLostItems = async (filters = {}) => {
+export const fetchLostItems = async (filters = {}, hostelId) => {
   try {
     const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
+    const q = withHostelFilter(lostItemsRef, hostelId);
     // Fetch all, filter client-side to avoid composite index requirement
-    const snapshot = await getDocs(lostItemsRef);
+    const snapshot = await getDocs(q);
 
     let items = await Promise.all(snapshot.docs.map(async (docSnap) => {
       const item = { id: docSnap.id, ...docSnap.data() };
@@ -113,11 +115,12 @@ export const fetchLostItemById = async (id) => {
 };
 
 // Create a new lost item entry
-export const createLostItem = async (itemData, userId) => {
+export const createLostItem = async (itemData, userId, hostelId) => {
   try {
     const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
     const docRef = await addDoc(lostItemsRef, {
       ...itemData,
+      hostelId,
       reported_by: userId,
       status: itemData.status || "lost",
       created_at: new Date().toISOString(),
@@ -195,14 +198,15 @@ export const deleteLostItem = async (id) => {
 };
 
 // Fetch lost items by user
-export const fetchUserLostItems = async (userId) => {
+export const fetchUserLostItems = async (userId, hostelId) => {
   try {
     const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
-    const q = query(
+    let q = query(
       lostItemsRef,
       where("reported_by", "==", userId),
       orderBy("created_at", "desc")
     );
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
@@ -213,10 +217,11 @@ export const fetchUserLostItems = async (userId) => {
 };
 
 // Search lost items
-export const searchLostItems = async (searchQuery) => {
+export const searchLostItems = async (searchQuery, hostelId) => {
   try {
     const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
-    const q = query(lostItemsRef, orderBy("created_at", "desc"));
+    let q = query(lostItemsRef, orderBy("created_at", "desc"));
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     const searchLower = searchQuery.toLowerCase();
@@ -253,10 +258,11 @@ export const searchLostItems = async (searchQuery) => {
 };
 
 // Get lost items statistics
-export const getLostItemStats = async () => {
+export const getLostItemStats = async (hostelId) => {
   try {
     const lostItemsRef = collection(db, LOST_ITEMS_COLLECTION);
-    const snapshot = await getDocs(lostItemsRef);
+    const q = withHostelFilter(lostItemsRef, hostelId);
+    const snapshot = await getDocs(q);
 
     const stats = {
       total: snapshot.size,

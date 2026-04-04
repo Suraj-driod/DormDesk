@@ -14,15 +14,17 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { processNewIssue } from "./geminiSimilarity.service";
+import { withHostelFilter } from "../Lib/utilities";
 
 const ISSUES_COLLECTION = "issues";
 
 // Fetch all issues with optional filters
-export const fetchIssues = async (filters = {}) => {
+export const fetchIssues = async (filters = {}, hostelId) => {
   try {
     const issuesRef = collection(db, ISSUES_COLLECTION);
+    const q = withHostelFilter(issuesRef, hostelId);
     // Fetch all, filter client-side to avoid composite index requirement
-    const snapshot = await getDocs(issuesRef);
+    const snapshot = await getDocs(q);
 
     let issues = await Promise.all(snapshot.docs.map(async (docSnap) => {
       const issue = { id: docSnap.id, ...docSnap.data() };
@@ -158,10 +160,11 @@ const validateIssueData = (issueData) => {
 };
 
 // Direct insert helper
-const directInsertIssue = async (issueData) => {
+const directInsertIssue = async (issueData, hostelId) => {
   const issuesRef = collection(db, ISSUES_COLLECTION);
   const docRef = await addDoc(issuesRef, {
     ...issueData,
+    hostelId,
     repost_count: 0,
     created_at: new Date().toISOString(),
   });
@@ -171,17 +174,17 @@ const directInsertIssue = async (issueData) => {
 };
 
 // Create a new issue with optional similarity detection
-export const createIssue = async (issueData, useSimilarityCheck = true) => {
+export const createIssue = async (issueData, hostelId, useSimilarityCheck = true) => {
   validateIssueData(issueData);
 
   if (!useSimilarityCheck) {
-    return directInsertIssue(issueData);
+    return directInsertIssue(issueData, hostelId);
   }
 
   try {
-    return await processNewIssue(issueData);
+    return await processNewIssue(issueData, hostelId);
   } catch (similarityError) {
-    return directInsertIssue(issueData);
+    return directInsertIssue(issueData, hostelId);
   }
 };
 
@@ -260,11 +263,12 @@ export const deleteIssue = async (id) => {
 };
 
 // Fetch issues for public feed
-export const fetchIssuesForFeed = async () => {
+export const fetchIssuesForFeed = async (hostelId) => {
   try {
     const issuesRef = collection(db, ISSUES_COLLECTION);
+    const q = withHostelFilter(issuesRef, hostelId);
     // Fetch all issues, filter client-side to avoid composite index requirement
-    const snapshot = await getDocs(issuesRef);
+    const snapshot = await getDocs(q);
 
     console.log("Total issues in DB:", snapshot.docs.length);
 
@@ -323,10 +327,11 @@ export const fetchIssuesForFeed = async () => {
 };
 
 // Fetch issues assigned to a specific caretaker (no orderBy to avoid composite index)
-export const fetchAssignedIssues = async (caretakerId) => {
+export const fetchAssignedIssues = async (caretakerId, hostelId) => {
   if (!caretakerId) return [];
   const issuesRef = collection(db, ISSUES_COLLECTION);
-  const q = query(issuesRef, where("assigned_to", "==", caretakerId));
+  let q = query(issuesRef, where("assigned_to", "==", caretakerId));
+  q = withHostelFilter(q, hostelId);
   const snapshot = await getDocs(q);
 
   const issues = await Promise.all(snapshot.docs.map(async (docSnap) => {
@@ -351,9 +356,10 @@ export const fetchAssignedIssues = async (caretakerId) => {
 };
 
 // Get issue statistics for dashboard
-export const getIssueStats = async () => {
+export const getIssueStats = async (hostelId) => {
   const issuesRef = collection(db, ISSUES_COLLECTION);
-  const snapshot = await getDocs(issuesRef);
+  const q = withHostelFilter(issuesRef, hostelId);
+  const snapshot = await getDocs(q);
 
   const stats = {
     total: snapshot.size,
@@ -373,13 +379,14 @@ export const getIssueStats = async () => {
 };
 
 // Get pending issues (not assigned)
-export const fetchPendingIssues = async () => {
+export const fetchPendingIssues = async (hostelId) => {
   const issuesRef = collection(db, ISSUES_COLLECTION);
-  const q = query(
+  let q = query(
     issuesRef,
     where("status", "==", "reported"),
     orderBy("created_at", "asc")
   );
+  q = withHostelFilter(q, hostelId);
   const snapshot = await getDocs(q);
 
   const issues = await Promise.all(snapshot.docs.map(async (docSnap) => {

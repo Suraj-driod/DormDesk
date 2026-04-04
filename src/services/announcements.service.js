@@ -12,15 +12,17 @@ import {
   limit 
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { withHostelFilter } from "../Lib/utilities";
 
 const ANNOUNCEMENTS_COLLECTION = "announcements";
 
 // Fetch all announcements
-export const fetchAnnouncements = async (filters = {}) => {
+export const fetchAnnouncements = async (filters = {}, hostelId) => {
   try {
     const announcementsRef = collection(db, ANNOUNCEMENTS_COLLECTION);
+    const q = withHostelFilter(announcementsRef, hostelId);
     // Fetch all, sort client-side to avoid index issues
-    const snapshot = await getDocs(announcementsRef);
+    const snapshot = await getDocs(q);
 
     let announcements = await Promise.all(snapshot.docs.map(async (docSnap) => {
       const announcement = { id: docSnap.id, ...docSnap.data() };
@@ -112,11 +114,12 @@ export const fetchAnnouncementById = async (id) => {
 };
 
 // Create a new announcement (Admin only)
-export const createAnnouncement = async (announcementData, userId) => {
+export const createAnnouncement = async (announcementData, userId, hostelId) => {
   try {
     const announcementsRef = collection(db, ANNOUNCEMENTS_COLLECTION);
     const docRef = await addDoc(announcementsRef, {
       ...announcementData,
+      hostelId,
       created_by: userId,
       created_at: new Date().toISOString(),
     });
@@ -161,10 +164,11 @@ export const deleteAnnouncement = async (id) => {
 };
 
 // Fetch announcements for a specific user's hostel/block
-export const fetchAnnouncementsForUser = async (userHostel, userBlock) => {
+export const fetchAnnouncementsForUser = async (userHostel, userBlock, hostelId) => {
   try {
     const announcementsRef = collection(db, ANNOUNCEMENTS_COLLECTION);
-    const q = query(announcementsRef, orderBy("created_at", "desc"));
+    let q = query(announcementsRef, orderBy("created_at", "desc"));
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     const announcements = await Promise.all(snapshot.docs.map(async (docSnap) => {
@@ -234,18 +238,19 @@ export const voteOnPoll = async (announcementId, option, userId) => {
 };
 
 // Get recent announcements (last 7 days)
-export const fetchRecentAnnouncements = async (limitCount = 5) => {
+export const fetchRecentAnnouncements = async (limitCount = 5, hostelId) => {
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const announcementsRef = collection(db, ANNOUNCEMENTS_COLLECTION);
-    const q = query(
+    let q = query(
       announcementsRef,
       where("created_at", ">=", sevenDaysAgo.toISOString()),
       orderBy("created_at", "desc"),
       limit(limitCount)
     );
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     const announcements = await Promise.all(snapshot.docs.map(async (docSnap) => {

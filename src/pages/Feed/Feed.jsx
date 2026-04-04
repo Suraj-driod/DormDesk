@@ -116,7 +116,7 @@ const Feed = () => {
 
       switch (activeTab) {
         case "issues":
-          const issues = await fetchIssuesForFeed();
+          const issues = await fetchIssuesForFeed(profile?.hostelId);
           data = issues?.map((issue) => ({
             id: issue.id,
             title: issue.title,
@@ -148,7 +148,7 @@ const Feed = () => {
           break;
 
         case "announcements": {
-          const announcements = await fetchAnnouncements();
+          const announcements = await fetchAnnouncements({}, profile?.hostelId);
           data =
             announcements?.map((ann) => ({
               id: ann.id,
@@ -181,7 +181,7 @@ const Feed = () => {
         }
 
         case "lost": {
-          const lostItems = await fetchLostItems({ status: "lost" });
+          const lostItems = await fetchLostItems({ status: "lost" }, profile?.hostelId);
           data =
             lostItems?.map((item) => ({
               id: item.id,
@@ -215,7 +215,7 @@ const Feed = () => {
 
         case "complaints": {
           const complaintsFilters = isStudent ? { raised_by: profile?.id } : {};
-          const complaints = await fetchComplaints(complaintsFilters);
+          const complaints = await fetchComplaints(complaintsFilters, profile?.hostelId);
           data =
             complaints?.map((comp) => ({
               id: comp.id,

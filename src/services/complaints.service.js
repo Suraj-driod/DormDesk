@@ -11,15 +11,17 @@ import {
   orderBy 
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { withHostelFilter } from "../Lib/utilities";
 
 const COMPLAINTS_COLLECTION = "complaints";
 
 // Fetch all complaints
-export const fetchComplaints = async (filters = {}) => {
+export const fetchComplaints = async (filters = {}, hostelId) => {
   try {
     const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
+    const q = withHostelFilter(complaintsRef, hostelId);
     // Fetch all, filter client-side to avoid composite index requirement
-    const snapshot = await getDocs(complaintsRef);
+    const snapshot = await getDocs(q);
 
     let complaints = await Promise.all(snapshot.docs.map(async (docSnap) => {
       const complaint = { id: docSnap.id, ...docSnap.data() };
@@ -111,11 +113,12 @@ export const fetchComplaintById = async (id) => {
 };
 
 // Create a new complaint
-export const createComplaint = async (complaintData, userId) => {
+export const createComplaint = async (complaintData, userId, hostelId) => {
   try {
     const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
     const docRef = await addDoc(complaintsRef, {
       ...complaintData,
+      hostelId,
       raised_by: userId,
       status: "submitted",
       created_at: new Date().toISOString(),
@@ -167,14 +170,15 @@ export const deleteComplaint = async (id) => {
 };
 
 // Fetch complaints by user
-export const fetchUserComplaints = async (userId) => {
+export const fetchUserComplaints = async (userId, hostelId) => {
   try {
     const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
-    const q = query(
+    let q = query(
       complaintsRef,
       where("raised_by", "==", userId),
       orderBy("created_at", "desc")
     );
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     const complaints = await Promise.all(snapshot.docs.map(async (docSnap) => {
@@ -199,10 +203,11 @@ export const fetchUserComplaints = async (userId) => {
 };
 
 // Get complaint statistics
-export const getComplaintStats = async () => {
+export const getComplaintStats = async (hostelId) => {
   try {
     const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
-    const snapshot = await getDocs(complaintsRef);
+    const q = withHostelFilter(complaintsRef, hostelId);
+    const snapshot = await getDocs(q);
 
     const stats = {
       total: snapshot.size,
@@ -224,14 +229,15 @@ export const getComplaintStats = async () => {
 };
 
 // Fetch pending complaints for admin
-export const fetchPendingComplaints = async () => {
+export const fetchPendingComplaints = async (hostelId) => {
   try {
     const complaintsRef = collection(db, COMPLAINTS_COLLECTION);
-    const q = query(
+    let q = query(
       complaintsRef,
       where("status", "in", ["submitted", "under_review"]),
       orderBy("created_at", "asc")
     );
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     const complaints = await Promise.all(snapshot.docs.map(async (docSnap) => {

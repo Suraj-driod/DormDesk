@@ -33,7 +33,7 @@ const VISIBILITY_OPTIONS = [
 ];
 
 const ReportIssue = () => {
-  const { user } = useAuth(); 
+  const { user, profile } = useAuth(); 
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const [dragActive, setDragActive] = useState(false);
@@ -80,9 +80,9 @@ const ReportIssue = () => {
 
   // --- SUBMISSION HANDLER ---
   const onSubmit = async (data) => {
-    if (!user?.uid) {
-      console.error("Submit blocked: No authenticated user");
-      showWarning("You must be logged in to submit an issue.");
+    if (!user?.uid || !profile?.hostelId) {
+      console.error("Submit blocked: No authenticated user or missing hostel");
+      showWarning("You must be logged in and assigned to a hostel to submit an issue.");
       return;
     }
 
@@ -117,7 +117,7 @@ const ReportIssue = () => {
       };
 
       // 3. Create issue
-      const result = await createIssue(issuePayload, false);
+      const result = await createIssue(issuePayload, profile.hostelId, false);
 
       if (result.isDuplicate) {
         showSuccess(result.message, {

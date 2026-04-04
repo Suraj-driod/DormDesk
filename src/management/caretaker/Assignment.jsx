@@ -61,7 +61,7 @@ const Assignment = () => {
     if (!caretakerId) return;
     setLoading(true);
     try {
-      const data = await fetchAssignedIssues(caretakerId);
+      const data = await fetchAssignedIssues(caretakerId, profile?.hostelId);
       setAssignments(data || []);
     } catch (error) {
       console.error("Error loading assignments:", error);

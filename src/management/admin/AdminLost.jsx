@@ -17,7 +17,7 @@ const TABS = [
 ];
 
 const AdminLost = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const { alertState, closeAlert, error: showError } = useAlert();
@@ -36,7 +36,7 @@ const AdminLost = () => {
   const loadItems = async () => {
     setLoading(true);
     try {
-      const data = await fetchLostItems();
+      const data = await fetchLostItems({}, profile?.hostelId);
       setItems(data || []);
     } catch (error) {
       console.error("Error loading items:", error);

@@ -12,6 +12,7 @@ import {
   limit 
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { withHostelFilter } from "../Lib/utilities";
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -25,7 +26,7 @@ const REPOST_THRESHOLD = 5;
 /**
  * Detect similar posts using Gemini AI
  */
-export const detectSimilarPost = async (newTitle, newDescription, category) => {
+export const detectSimilarPost = async (newTitle, newDescription, category, hostelId) => {
   try {
     if (!API_KEY) {
       console.warn("Gemini API key not found, skipping similarity check");
@@ -37,12 +38,13 @@ export const detectSimilarPost = async (newTitle, newDescription, category) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const issuesRef = collection(db, "issues");
-    const q = query(
+    let q = query(
       issuesRef,
       where("category", "==", category),
       orderBy("created_at", "desc"),
       limit(50)
     );
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     // Filter out closed issues
@@ -158,7 +160,7 @@ export const incrementRepostCount = async (issueId) => {
 /**
  * Process new issue submission with similarity check
  */
-export const processNewIssue = async (issueData) => {
+export const processNewIssue = async (issueData, hostelId) => {
   // CRITICAL: Validate created_by before any DB operation
   if (!issueData.created_by) {
     const error = new Error("created_by is required - cannot create issue without user ID");
@@ -172,7 +174,7 @@ export const processNewIssue = async (issueData) => {
   // Try similarity check, but don't block submission if it fails
   let similarPost = null;
   try {
-    similarPost = await detectSimilarPost(title, description, category);
+    similarPost = await detectSimilarPost(title, description, category, hostelId);
   } catch (similarityError) {
     console.warn("Similarity detection failed (continuing with insert):", similarityError);
   }
@@ -199,6 +201,7 @@ export const processNewIssue = async (issueData) => {
   const issuesRef = collection(db, "issues");
   const docRef = await addDoc(issuesRef, {
     ...issueData,
+    hostelId,
     repost_count: 0,
     created_at: new Date().toISOString(),
   });
@@ -214,7 +217,7 @@ export const processNewIssue = async (issueData) => {
 /**
  * Get similarity suggestions while typing
  */
-export const getSimilaritySuggestions = async (title, category) => {
+export const getSimilaritySuggestions = async (title, category, hostelId) => {
   if (!title || title.length < 10) return [];
 
   try {
@@ -222,11 +225,12 @@ export const getSimilaritySuggestions = async (title, category) => {
     if (keywords.length === 0) return [];
 
     const issuesRef = collection(db, "issues");
-    const q = query(
+    let q = query(
       issuesRef,
       where("category", "==", category),
       limit(10)
     );
+    q = withHostelFilter(q, hostelId);
     const snapshot = await getDocs(q);
 
     const potentialMatches = snapshot.docs

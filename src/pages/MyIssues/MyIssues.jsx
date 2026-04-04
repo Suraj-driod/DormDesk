@@ -117,7 +117,7 @@ const MyIssues = () => {
 
       switch (activeTab) {
         case "issues": {
-          const issues = await fetchIssues({ created_by: uid });
+          const issues = await fetchIssues({ created_by: uid }, profile?.hostelId);
           data =
             issues?.map((issue) => ({
               id: issue.id,
@@ -148,7 +148,7 @@ const MyIssues = () => {
         }
 
         case "lost": {
-          const allLost = await fetchLostItems();
+          const allLost = await fetchLostItems({}, profile?.hostelId);
           const lostItems = (allLost || []).filter((item) => item.reported_by === uid);
           data = lostItems.map((item) => ({
             id: item.id,
@@ -181,7 +181,7 @@ const MyIssues = () => {
         }
 
         case "complaints": {
-          const complaints = await fetchComplaints({ raised_by: profile?.id || uid });
+          const complaints = await fetchComplaints({ raised_by: profile?.id || uid }, profile?.hostelId);
           data = complaints?.map((comp) => ({
             id: comp.id,
             title: `${comp.complaint_type} Complaint`,

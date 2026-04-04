@@ -15,7 +15,7 @@ const STATUS_OPTIONS = [
 ];
 
 const LostFound = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [imagePreview, setImagePreview] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef(null);
@@ -65,7 +65,7 @@ const LostFound = () => {
         location: data.location,
         status: data.status,
         image_url: imageUrl,
-      }, user.uid);
+      }, user.uid, profile?.hostelId);
 
       showSuccess('Item reported successfully!', {
         onClose: () => {
