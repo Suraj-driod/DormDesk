@@ -2,7 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 
 export const RequireAuth = ({ children }) => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, logout } = useAuth();
   const location = useLocation();
 
   // Show loading while auth is initializing OR while user is present but profile is still fetching
@@ -34,6 +34,12 @@ export const RequireAuth = ({ children }) => {
           <p className="text-gray-500 mb-6">
             Your account is not assigned to a hostel. Please contact the administrator.
           </p>
+          <button
+            onClick={async () => await logout()}
+            className="inline-block px-6 py-3 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-colors"
+          >
+            Sign Out
+          </button>
         </div>
       </div>
     );

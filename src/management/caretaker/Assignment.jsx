@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Filter, CheckCircle, Clock, 
-  Globe, Lock, AlertCircle, XCircle, RefreshCw
+  Globe, Lock, AlertCircle, XCircle, RefreshCw, ShieldCheck
 } from "lucide-react";
 
 import { SelectBetter } from "../../UI/SelectBetter"; 
@@ -134,6 +134,7 @@ const Assignment = () => {
           item.title?.toLowerCase().includes(query) ||
           item.room_no?.toLowerCase().includes(query) ||
           item.description?.toLowerCase().includes(query);
+        // Note: reporter name is intentionally excluded from search
         if (!matchesSearch) return false;
       }
 
@@ -242,6 +243,7 @@ const Assignment = () => {
                   <tr className="bg-gray-50/50 border-b border-gray-100">
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Issue Details</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Location</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Reported By</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Status</th>
                     {activeTab !== 'completed' && (
                       <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Quick Update</th>
@@ -269,6 +271,19 @@ const Assignment = () => {
                           <span className="font-medium text-gray-800">{item.hostel}</span>
                           <span className="text-gray-400 mx-1">|</span>
                           Block {item.block} - {item.room_no}
+                        </div>
+                      </td>
+
+                      {/* Reporter identity — masked for caretaker privacy */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <ShieldCheck size={14} className="text-gray-400" />
+                          </div>
+                          <div>
+                            <span className="text-sm text-gray-500 italic">Anonymous Student</span>
+                            <p className="text-[10px] text-gray-400">Identity protected</p>
+                          </div>
                         </div>
                       </td>
 

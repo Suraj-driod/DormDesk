@@ -1,8 +1,10 @@
 // Buttons
 export { default as Button } from "./Button/Button";
 
-// Uploads
+// Uploads / Media
 export { default as ImageUpload } from "./ImageUpload/ImageUpload";
+export { default as MediaUpload } from "./MediaUpload/MediaUpload";
+export { default as MediaRenderer } from "./MediaRenderer/MediaRenderer";
 
 // Post Base
 export { default as PostBase } from "./PostBase/PostBase";

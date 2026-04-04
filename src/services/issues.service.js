@@ -326,6 +326,21 @@ export const fetchIssuesForFeed = async (hostelId) => {
   }
 };
 
+// ── Anonymization helper ──────────────────────────────────────────────────────
+// Strips reporter identity from issues shown to caretakers.
+// Admin views should NOT use this — they fetch profiles directly.
+export const maskIssueForCaretaker = (issue) => ({
+  ...issue,
+  created_by: null,       // hide UID
+  profile: {
+    name: "Anonymous Student",
+    avatar_url: null,
+    email: null,
+    phone: null,
+    room_no: null,
+  },
+});
+
 // Fetch issues assigned to a specific caretaker (no orderBy to avoid composite index)
 export const fetchAssignedIssues = async (caretakerId, hostelId) => {
   if (!caretakerId) return [];
@@ -336,16 +351,20 @@ export const fetchAssignedIssues = async (caretakerId, hostelId) => {
 
   const issues = await Promise.all(snapshot.docs.map(async (docSnap) => {
     const issue = { id: docSnap.id, ...docSnap.data() };
-    
+    // Fetch profile for internal use only — will be masked before returning
     if (issue.created_by) {
-      const profileRef = doc(db, "users", issue.created_by);
-      const profileSnap = await getDoc(profileRef);
-      if (profileSnap.exists()) {
-        issue.profile = { id: profileSnap.id, ...profileSnap.data() };
+      try {
+        const profileRef = doc(db, "users", issue.created_by);
+        const profileSnap = await getDoc(profileRef);
+        if (profileSnap.exists()) {
+          issue.profile = { id: profileSnap.id, ...profileSnap.data() };
+        }
+      } catch (e) {
+        console.warn("Could not fetch creator profile:", e);
       }
     }
-    
-    return issue;
+    // Apply anonymization — caretakers must not see reporter identity
+    return maskIssueForCaretaker(issue);
   }));
 
   return issues.sort((a, b) => {

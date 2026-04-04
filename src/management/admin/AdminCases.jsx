@@ -35,7 +35,7 @@ const AdminCases = () => {
   const [cases, setCases] = useState([]);
   const [caretakers, setCaretakers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { alertState, closeAlert, error: showError } = useAlert();
+  const { alertState, closeAlert, error: showError, success: showSuccess } = useAlert();
 
   // UI State
   const [activeTab, setActiveTab] = useState("pending");
@@ -101,7 +101,8 @@ const AdminCases = () => {
 
   const handleOpenAssignModal = (caseItem) => {
     setSelectedCase(caseItem);
-    setSelectedCaretaker("");
+    // Pre-select existing caretaker if this is a reassignment
+    setSelectedCaretaker(caseItem.assigned_to || "");
     setAssignModalOpen(true);
   };
 
@@ -109,14 +110,16 @@ const AdminCases = () => {
     if (!selectedCaretaker || !selectedCase) return;
     
     try {
-      await assignIssue(selectedCase.id, selectedCaretaker, user?.id);
+      await assignIssue(selectedCase.id, selectedCaretaker, user?.uid ?? profile?.id ?? profile?.managementDocId);
+      const pickedCaretaker = caretakers.find(ct => ct.id === selectedCaretaker);
       setCases(prev => prev.map(c => 
         c.id === selectedCase.id 
-          ? { ...c, assigned_to: selectedCaretaker, status: 'assigned', assigned_profile: caretakers.find(ct => ct.id === selectedCaretaker) }
+          ? { ...c, assigned_to: selectedCaretaker, status: 'assigned', assigned_profile: pickedCaretaker }
           : c
       ));
       setAssignModalOpen(false);
       setSelectedCase(null);
+      showSuccess(`Issue assigned to ${pickedCaretaker?.full_name || "caretaker"} successfully.`);
     } catch (err) {
       console.error("Error assigning:", err);
       showError("Failed to assign caretaker");
@@ -291,8 +294,11 @@ const AdminCases = () => {
                             <UserPlus size={16} /> Assign
                           </button>
                         ) : (
-                          <button className="text-gray-400 hover:text-blue-600 font-medium text-sm flex items-center gap-1 ml-auto">
-                            Reassign <ChevronRight size={14} />
+                          <button
+                            onClick={() => handleOpenAssignModal(item)}
+                            className="text-blue-500 hover:text-blue-700 font-medium text-sm flex items-center gap-1 ml-auto border border-blue-200 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            <UserPlus size={14} /> Reassign
                           </button>
                         )}
                       </td>
@@ -343,12 +349,22 @@ const AdminCases = () => {
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-blue-500 outline-none"
                 >
                   <option value="">Choose a caretaker...</option>
-                  {caretakers.map((ct) => (
-                    <option key={ct.id} value={ct.id}>
-                      {ct.full_name} - {ct.hostel_block || 'All Blocks'}
-                    </option>
-                  ))}
+                  {caretakers.map((ct) => {
+                    const workload = cases.filter(c =>
+                      c.assigned_to === ct.id && !["resolved", "closed"].includes(c.status)
+                    ).length;
+                    return (
+                      <option key={ct.id} value={ct.id}>
+                        {ct.full_name} — {ct.hostel_block || 'All Blocks'} · {workload} active tasks
+                      </option>
+                    );
+                  })}
                 </select>
+                {selectedCaretaker && selectedCase?.assigned_to === selectedCaretaker && (
+                  <p className="text-xs text-blue-600 mt-1.5 flex items-center gap-1">
+                    ✓ Currently assigned caretaker
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3">
@@ -363,7 +379,7 @@ const AdminCases = () => {
                   disabled={!selectedCaretaker}
                   className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl font-medium hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Assign
+                  {selectedCase?.assigned_to ? "Reassign" : "Assign"}
                 </button>
               </div>
             </motion.div>

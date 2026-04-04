@@ -1,12 +1,12 @@
 import { useForm } from 'react-hook-form';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { theme } from '../../theme';
 import { Button, AlertModal } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert';
 import { createComplaint } from '../../services/complaints.service';
-import { uploadToImgBB } from '../../services/imgbb.service';
+import MediaUpload from '../../components/core/MediaUpload/MediaUpload';
 
 const COMPLAINT_TYPES = [
   { value: 'caretaker', label: 'Caretaker' },
@@ -16,10 +16,7 @@ const COMPLAINT_TYPES = [
 
 const Complaint = () => {
   const { user, profile } = useAuth(); 
-  const [mediaPreview, setMediaPreview] = useState(null);
-  const [mediaType, setMediaType] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef(null);
+  const mediaUploadRef = useRef(null);
   const { alertState, closeAlert, success: showSuccess, error: showError, warning: showWarning } = useAlert();
 
   const {
@@ -53,28 +50,22 @@ const Complaint = () => {
     }
 
     try {
-      // Upload media to ImgBB if exists
-      let mediaUrl = null;
-      if (data.media && data.media.type?.startsWith('image/')) {
-        try {
-          mediaUrl = await uploadToImgBB(data.media);
-        } catch (uploadError) {
-          console.warn("Image upload failed:", uploadError);
-        }
+      // Upload media to Cloudinary on submit
+      let mediaArray = [];
+      if (mediaUploadRef.current) {
+        mediaArray = await mediaUploadRef.current.triggerUpload();
       }
 
       await createComplaint({
         complaint_type: data.complaintType,
         description: data.description,
         accused_user: data.accusedName,
-        media_url: mediaUrl,
+        media: mediaArray,
       }, user.uid, profile?.hostelId);
 
       showSuccess('Complaint submitted successfully!', {
         onClose: () => {
           reset();
-          setMediaPreview(null);
-          setMediaType(null);
         }
       });
 
@@ -87,55 +78,6 @@ const Complaint = () => {
   const handleSelectChange = (name, value) => {
     setValue(name, value);
     trigger(name);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    processFile(file);
-  };
-
-  const processFile = (file) => {
-    if (!file) return;
-    const maxSize = 32 * 1024 * 1024; // 32MB for ImgBB
-    if (file.size > maxSize) {
-      showWarning('File size must be less than 32MB');
-      return;
-    }
-    const isImage = file.type.startsWith('image/');
-    if (!isImage) {
-      showWarning('Please upload an image file');
-      return;
-    }
-    setMediaType('image');
-    setValue('media', file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setMediaPreview(ev.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    processFile(file);
-  };
-
-  const removeMedia = () => {
-    setMediaPreview(null);
-    setMediaType(null);
-    setValue('media', null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const inputStyles = `
@@ -234,83 +176,19 @@ const Complaint = () => {
             )}
           </div>
 
-          {/* Media Proof */}
+          {/* Media Upload */}
           <div className="mb-5">
-            <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
-              Media Proof (Optional - Images only)
-            </label>
-
-            <input {...register('media')} type="hidden" />
-
-            <div
-              className={`
-                relative overflow-hidden min-h-[160px] rounded-2xl cursor-pointer
-                flex items-center justify-center transition-all duration-200
-                ${
-                  mediaPreview
-                    ? `p-0 border-2 border-solid border-[#7CF3FF] ${theme.glow}`
-                    : `p-6 border-2 border-dashed border-[#00E5FF] bg-[#F0FEFF] hover:bg-[#E0F7FA]`
-                }
-                ${dragActive ? 'bg-[#E0F7FA] border-[#00B8D4]' : ''}
-              `}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="absolute w-px h-px p-0 -m-px overflow-hidden border-0"
-                style={{ clip: 'rect(0,0,0,0)' }}
-              />
-
-              {mediaPreview ? (
-                <div className="w-full h-full relative min-h-[160px]">
-                  <img
-                    src={mediaPreview}
-                    alt="Preview"
-                    className="w-full h-full object-cover block max-h-[300px]"
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex justify-end">
-                    <button
-                      type="button"
-                      className="flex items-center gap-1 bg-red-500/90 hover:bg-red-500 text-white border-none rounded-full px-3 py-1.5 text-sm cursor-pointer transition-all"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeMedia();
-                      }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2 text-center">
-                  <svg className="w-10 h-10 text-[#00E5FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                    <polyline points="17,8 12,3 7,8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                  <span className="text-sm text-gray-600">
-                    <span className="text-[#00E5FF] font-semibold">Click to upload</span> or drag and drop
-                  </span>
-                  <span className="text-xs text-gray-400">Images up to 32MB</span>
-                </div>
-              )}
-            </div>
+            <MediaUpload
+              ref={mediaUploadRef}
+              label="Media Proof (Optional — image, video, or audio)"
+              maxFiles={3}
+              accept="image/*,video/*,audio/*"
+            />
           </div>
 
           <div className="mb-6">
             <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
-              Incident Date & Time (Optional)
+              Incident Date &amp; Time (Optional)
             </label>
             <input
               {...register('incidentDateTime')}

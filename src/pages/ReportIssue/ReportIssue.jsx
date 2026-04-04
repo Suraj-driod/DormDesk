@@ -6,7 +6,7 @@ import { Button, AlertModal } from '../../UI/Glow';
 import { useAuth } from '../../auth/AuthContext';
 import { useAlert } from '../../hooks/useAlert'; 
 import { createIssue } from '../../services/issues.service';
-import { uploadToImgBB } from '../../services/imgbb.service';
+import MediaUpload from '../../components/core/MediaUpload/MediaUpload';
 
 // 1. Categories (Matches issue_category Enum)
 const CATEGORIES = [
@@ -34,10 +34,7 @@ const VISIBILITY_OPTIONS = [
 
 const ReportIssue = () => {
   const { user, profile } = useAuth(); 
-  const [mediaPreview, setMediaPreview] = useState(null);
-  const [mediaType, setMediaType] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef(null);
+  const mediaUploadRef = useRef(null);
   const { alertState, closeAlert, success: showSuccess, error: showError, warning: showWarning } = useAlert();
 
   const {
@@ -81,26 +78,18 @@ const ReportIssue = () => {
   // --- SUBMISSION HANDLER ---
   const onSubmit = async (data) => {
     if (!user?.uid || !profile?.hostelId) {
-      console.error("Submit blocked: No authenticated user or missing hostel");
       showWarning("You must be logged in and assigned to a hostel to submit an issue.");
       return;
     }
 
     try {
-      // 1. Upload Media to ImgBB (if exists)
-      let mediaUrl = null;
-      if (data.media && data.media.type?.startsWith('image/')) {
-        try {
-          console.log("Uploading image to ImgBB...");
-          mediaUrl = await uploadToImgBB(data.media);
-          console.log("Image uploaded successfully:", mediaUrl);
-        } catch (uploadError) {
-          console.warn("Image upload failed:", uploadError);
-          // Continue without image if upload fails
-        }
+      // 1. Upload media files to Cloudinary (upload happens here on submit)
+      let mediaArray = [];
+      if (mediaUploadRef.current) {
+        mediaArray = await mediaUploadRef.current.triggerUpload();
       }
 
-      // 2. Build issue payload
+      // 2. Build issue payload — new schema stores media array
       const issuePayload = {
         title: data.title,
         description: data.description,
@@ -113,100 +102,27 @@ const ReportIssue = () => {
         block: data.block,
         floor: data.floor || null,
         room_no: data.roomNumber || null,
-        media_url: mediaUrl,
+        media: mediaArray,
       };
 
       // 3. Create issue
       const result = await createIssue(issuePayload, profile.hostelId, false);
 
       if (result.isDuplicate) {
-        showSuccess(result.message, {
-          onClose: () => {
-            reset();
-            setMediaPreview(null);
-            setMediaType(null);
-          }
-        });
+        showSuccess(result.message, { onClose: () => reset() });
       } else {
-        showSuccess("Issue submitted successfully!", { 
-          onClose: () => {
-            reset(); 
-            setMediaPreview(null);
-            setMediaType(null);
-          }
-        });
+        showSuccess("Issue submitted successfully!", { onClose: () => reset() });
       }
 
     } catch (err) {
       console.error('Error submitting issue:', err);
-      const errorMessage = err?.message || 'Unknown error';
-      showError(`Failed to submit issue: ${errorMessage}`);
+      showError(`Failed to submit issue: ${err?.message || 'Unknown error'}`);
     }
   };
 
   const handleSelectChange = (name, value) => {
     setValue(name, value);
     trigger(name);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0];
-    processFile(file);
-  };
-
-  const processFile = (file) => {
-    if (!file) return;
-
-    const maxSize = 32 * 1024 * 1024; // 32MB for ImgBB
-    if (file.size > maxSize) {
-      showWarning('File size must be less than 32MB');
-      return;
-    }
-
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
-
-    if (!isVideo && !isImage) {
-      showWarning('Please upload an image or video file');
-      return;
-    }
-
-    if (isVideo) {
-      showWarning('Video upload is not supported. Please upload an image instead.');
-      return;
-    }
-
-    setMediaType(isImage ? 'image' : 'video');
-    setValue('media', file);
-
-    const reader = new FileReader();
-    reader.onload = (e) => setMediaPreview(e.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const file = e.dataTransfer.files?.[0];
-    processFile(file);
-  };
-
-  const removeMedia = () => {
-    setMediaPreview(null);
-    setMediaType(null);
-    setValue('media', null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const inputStyles = `
@@ -395,73 +311,12 @@ const ReportIssue = () => {
               </div>
 
               <div className="mb-5">
-                <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
-                  Photo Proof (Images only)
-                </label>
-                <div
-                  className={`
-                    relative overflow-hidden min-h-[160px] rounded-2xl cursor-pointer
-                    flex items-center justify-center transition-all duration-200
-                    ${
-                      mediaPreview
-                        ? `p-0 border-2 border-solid border-[#7CF3FF] ${theme.glow}`
-                        : `p-6 border-2 border-dashed border-[#00E5FF] bg-[#F0FEFF] hover:bg-[#E0F7FA]`
-                    }
-                    ${dragActive ? 'bg-[#E0F7FA] border-[#00B8D4]' : ''}
-                  `}
-                  onDragEnter={handleDrag}
-                  onDragLeave={handleDrag}
-                  onDragOver={handleDrag}
-                  onDrop={handleDrop}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="absolute w-px h-px p-0 -m-px overflow-hidden border-0"
-                    style={{ clip: 'rect(0,0,0,0)' }}
-                  />
-
-                  {mediaPreview ? (
-                    <div className="w-full h-full relative min-h-[160px]">
-                      <img
-                        src={mediaPreview}
-                        alt="Preview"
-                        className="w-full h-full object-cover block max-h-[300px]"
-                      />
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 flex justify-end">
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 bg-red-500/90 hover:bg-red-500 text-white border-none rounded-full px-3 py-1.5 text-sm cursor-pointer transition-all"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeMedia();
-                          }}
-                        >
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 text-center">
-                      <svg className="w-10 h-10 text-[#00E5FF]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                        <polyline points="17,8 12,3 7,8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                      <span className="text-sm text-gray-600">
-                        <span className="text-[#00E5FF] font-semibold">Click to upload</span> or drag and drop
-                      </span>
-                      <span className="text-xs text-gray-400">Images up to 32MB</span>
-                    </div>
-                  )}
-                </div>
+                <MediaUpload
+                  ref={mediaUploadRef}
+                  label="Photo / Video / Audio Proof (Optional)"
+                  maxFiles={3}
+                  accept="image/*,video/*,audio/*"
+                />
               </div>
 
               <div className="mb-6">

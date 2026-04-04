@@ -1,4 +1,5 @@
 import React, { useState, isValidElement } from 'react';
+import MediaRenderer from '../MediaRenderer/MediaRenderer';
 
 const PostBase = ({
   // Header props
@@ -13,6 +14,7 @@ const PostBase = ({
   
   // Media props
   media,
+  mediaSlot,
   
   // Status props
   visibility = 'public',
@@ -307,31 +309,19 @@ const PostBase = ({
       </div>
 
       {/* Media Preview */}
-      {media && (
+      {(mediaSlot || media) && (
         <div className="px-4 pb-3">
-          {media.type === 'image' && (
-            <div className="rounded-xl overflow-hidden bg-gray-100">
-              <img
-                src={media.url}
-                alt={media.alt || 'Post media'}
-                className="w-full max-h-80 object-cover"
-              />
-            </div>
+          {/* Explicit pre-rendered slot (e.g. from PostDetail via MediaRenderer) */}
+          {mediaSlot || null}
+          {/* Legacy media object prop — normalize via MediaRenderer */}
+          {!mediaSlot && media && (
+            <MediaRenderer
+              post={{
+                media_url: media.url,
+                media: media.url ? [{ url: media.url, resourceType: media.type || 'image', thumbnail: media.url }] : undefined,
+              }}
+            />
           )}
-          {media.type === 'video' && (
-            <div className="rounded-xl overflow-hidden bg-gray-900">
-              <video
-                src={media.url}
-                controls
-                className="w-full max-h-80"
-                poster={media.poster}
-              >
-                Your browser does not support the video tag.
-              </video>
-            </div>
-          )}
-          {/* Custom media via slot */}
-          {media.type === 'custom' && media.render && media.render()}
         </div>
       )}
         </>

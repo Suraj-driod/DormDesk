@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import PostDetailBase from "../../components/core/PostDetailBase/PostDetailBase";
+import MediaRenderer from "../../components/core/MediaRenderer/MediaRenderer";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
 import { useAuth } from "../../auth/AuthContext";
@@ -145,13 +146,13 @@ const PostDetail = () => {
 
   const post = useMemo(() => {
     if (isIssue && issue) {
-      const mediaUrl = issue.media_url || (issue.media && issue.media[0]);
       return {
         title: issue.title,
         author: issue.profile?.name || "Anonymous",
         timestamp: issue.created_at ? new Date(issue.created_at) : new Date(),
         content: issue.description,
-        media: mediaUrl ? { type: "image", url: mediaUrl } : null,
+        // Render media via MediaRenderer in footerSlot
+        mediaSlot: <MediaRenderer post={issue} fullSize />,
         mediaFullSize: true,
         upvoteCount: issue.upvotes?.[0]?.count ?? 0,
         commentCount: countCommentTree(commentTree),
@@ -163,7 +164,6 @@ const PostDetail = () => {
     }
     if (postEntity && POST_TYPES.includes(type)) {
       const e = postEntity;
-      const mediaUrl = e.media_url || e.image_url;
       const author = e.profile?.name || e.raised_by_profile?.name || e.reported_by_profile?.name || "Anonymous";
       const status = e.status || "Published";
       return {
@@ -171,7 +171,7 @@ const PostDetail = () => {
         author,
         timestamp: e.created_at ? new Date(e.created_at) : new Date(),
         content: e.content ?? e.description ?? "",
-        media: mediaUrl ? { type: "image", url: mediaUrl } : null,
+        mediaSlot: <MediaRenderer post={e} fullSize />,
         mediaFullSize: true,
         upvoteCount: upvoteCount,
         commentCount: countCommentTree(commentTree),

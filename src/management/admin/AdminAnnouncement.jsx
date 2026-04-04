@@ -1,14 +1,14 @@
 import { useForm } from 'react-hook-form';
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Megaphone, X, Plus, Image as ImageIcon, Trash2, CheckCircle } from 'lucide-react';
+import { Megaphone, X, Plus, CheckCircle } from 'lucide-react';
 
 import { theme } from '../../theme';
 import { Button, AlertModal } from '../../UI/Glow'; 
 import { SelectBetter } from '../../UI/SelectBetter'; 
 import { useAuth } from '../../auth/AuthContext'; 
 import { createAnnouncement } from '../../services/announcements.service';
-import { uploadToImgBB } from '../../services/imgbb.service';
+import MediaUpload from '../../components/core/MediaUpload/MediaUpload';
 import { useAlert } from '../../hooks/useAlert';
 
 const TARGET_HOSTELS = [
@@ -29,11 +29,9 @@ const TARGET_BLOCKS = [
 
 const AdminAnnouncement = () => {
   const { user, isAdmin, profile } = useAuth();
-  const [imagePreview, setImagePreview] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
+  const mediaUploadRef = useRef(null);
   const [showPoll, setShowPoll] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const fileInputRef = useRef(null);
   const { alertState, closeAlert, error: showError, warning: showWarning } = useAlert();
 
   const {
@@ -66,14 +64,10 @@ const AdminAnnouncement = () => {
     if (!isAdmin) { showWarning("Only admins can create announcements."); return; }
 
     try {
-      // Upload image to ImgBB if exists
-      let imageUrl = null;
-      if (data.image && data.image.type?.startsWith('image/')) {
-        try {
-          imageUrl = await uploadToImgBB(data.image);
-        } catch (uploadError) {
-          console.warn("Image upload failed:", uploadError);
-        }
+      // Upload media to Cloudinary on submit
+      let mediaArray = [];
+      if (mediaUploadRef.current) {
+        mediaArray = await mediaUploadRef.current.triggerUpload();
       }
 
       let pollDataJSON = null;
@@ -100,7 +94,7 @@ const AdminAnnouncement = () => {
         content: data.description,
         target_hostel: data.targetHostel,
         target_block: data.targetBlock,
-        image_url: imageUrl,
+        media: mediaArray,
         poll_data: pollDataJSON,
       }, user.uid, profile?.hostelId);
 
@@ -108,7 +102,6 @@ const AdminAnnouncement = () => {
       setTimeout(() => setSubmitSuccess(false), 3000);
       
       reset();
-      setImagePreview(null);
       setShowPoll(false);
 
     } catch (err) {
@@ -120,17 +113,6 @@ const AdminAnnouncement = () => {
   const handleSelectChange = (name, value) => {
     setValue(name, value);
     trigger(name);
-  };
-
-  const processFile = (file) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showWarning('Max file size 5MB'); return; }
-    if (!file.type.startsWith('image/')) { showWarning('Images only'); return; }
-
-    setValue('image', file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setImagePreview(ev.target.result);
-    reader.readAsDataURL(file);
   };
 
   const addPollOption = () => {
@@ -236,60 +218,14 @@ const AdminAnnouncement = () => {
             {errors.description && <span className="text-xs text-red-500 mt-1 ml-1">{errors.description.message}</span>}
           </div>
 
-          {/* Image Upload */}
+          {/* Media Upload */}
           <div className="mb-8">
-            <label className="text-sm font-bold text-gray-700 block mb-2 ml-1">
-              Attachment (Optional)
-            </label>
-            <input {...register('image')} type="hidden" />
-
-            <div
-              className={`
-                relative overflow-hidden min-h-[160px] rounded-3xl cursor-pointer
-                flex flex-col items-center justify-center transition-all duration-300
-                ${imagePreview 
-                  ? 'p-0 border-2 border-solid border-[#00B8D4]' 
-                  : 'p-6 border-2 border-dashed border-gray-300 bg-gray-50 hover:bg-white hover:border-[#00B8D4]'
-                }
-                ${dragActive ? 'bg-blue-50 border-[#00B8D4]' : ''}
-              `}
-              onDragEnter={(e) => { e.preventDefault(); setDragActive(true); }}
-              onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
-              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-              onDrop={(e) => { 
-                e.preventDefault(); setDragActive(false); 
-                processFile(e.dataTransfer.files?.[0]); 
-              }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => processFile(e.target.files?.[0])}
-                className="hidden"
-              />
-
-              {imagePreview ? (
-                <div className="w-full h-full relative group">
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover max-h-[400px]" />
-                  <button
-                    type="button"
-                    className="absolute top-4 right-4 bg-red-500 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => { e.stopPropagation(); setImagePreview(null); setValue('image', null); }}
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center space-y-2">
-                  <ImageIcon className="mx-auto text-gray-400" size={32} />
-                  <p className="text-sm text-gray-500">
-                    <span className="text-[#00B8D4] font-semibold">Click to upload</span> or drag and drop
-                  </p>
-                </div>
-              )}
-            </div>
+            <MediaUpload
+              ref={mediaUploadRef}
+              label="Attachment (Optional — image, video, or audio)"
+              maxFiles={3}
+              accept="image/*,video/*,audio/*"
+            />
           </div>
 
           {/* Poll Section */}

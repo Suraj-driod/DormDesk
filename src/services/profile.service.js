@@ -169,7 +169,7 @@ export const createProfile = async (userId, profileData) => {
   }
 };
 
-// Upload profile avatar (now using ImgBB URL)
+// Update profile avatar URL (uploaded separately via Cloudinary)
 export const updateAvatarUrl = async (userId, avatarUrl, role, userEmail = null) => {
   try {
     let docRef;

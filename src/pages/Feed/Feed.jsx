@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import PostBase from "../../components/core/PostBase/PostBase";
+import MediaRenderer from "../../components/core/MediaRenderer/MediaRenderer";
 import { SelectBetter } from "../../UI/SelectBetter";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
@@ -130,8 +131,8 @@ const Feed = () => {
             category: issue.category,
             priority: issue.priority,
             repostCount: issue.repost_count || 0,
-            // Media as object (not array) for PostBase
-            media: issue.media_url ? { type: "image", url: issue.media_url } : null,
+            // Pass raw document for MediaRenderer normalization
+            _rawDoc: issue,
           })) || [];
           
           // Check which issues user has voted on
@@ -161,7 +162,7 @@ const Feed = () => {
               comments: 0,
               visibility: "public",
               target: `${ann.target_hostel}${ann.target_block ? ` - ${ann.target_block}` : ""}`,
-              media: (ann.image_url || ann.media_url) ? { type: "image", url: ann.image_url || ann.media_url } : null,
+              _rawDoc: ann,
             })) || [];
           const annIds = data.map((p) => p.id);
           if (annIds.length) {
@@ -194,7 +195,7 @@ const Feed = () => {
               comments: 0,
               visibility: "public",
               location: item.location,
-              media: item.image_url ? { type: "image", url: item.image_url } : null,
+              _rawDoc: item,
             })) || [];
           const lostIds = data.map((p) => p.id);
           if (lostIds.length) {
@@ -228,7 +229,7 @@ const Feed = () => {
               comments: 0,
               visibility: "private",
               type: comp.complaint_type,
-              media: (comp.media_url || comp.image_url) ? { type: "image", url: comp.media_url || comp.image_url } : null,
+              _rawDoc: comp,
             })) || [];
           const compIds = data.map((p) => p.id);
           if (compIds.length) {
@@ -371,7 +372,6 @@ const Feed = () => {
                     timestamp={post.timestamp}
                     content={post.content}
                     visibility={post.visibility}
-                    media={post.media}
                     upvoteCount={post.upvotes}
                     commentCount={post.comments}
                     isUpvoted={votedPosts[post.id] || false}
@@ -397,6 +397,13 @@ const Feed = () => {
                             : activeTab === "complaints"
                               ? getComplaintTimeline(post.status, { timestamp: post.timestamp?.toLocaleDateString?.() })
                               : [{ label: "Posted", timestamp: post.timestamp?.toLocaleDateString?.(), active: true }, { label: post.status, timestamp: "Current", active: true }]
+                    }
+                    footerSlot={
+                      post._rawDoc ? (
+                        <div className="pb-1">
+                          <MediaRenderer post={post._rawDoc} />
+                        </div>
+                      ) : null
                     }
                     extras={
                       post.repostCount > 0 && (
