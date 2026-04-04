@@ -20,3 +20,6 @@ export { default as LostFoundPost } from "./PostVariants/LostFoundPost";
 export { default as Select } from "./Select/Select";
 export { default as TextArea } from "./TextArea/TextArea";
 export { default as TextInput } from "./TextInput/TextInput";
+
+// Notifications
+export { default as NotificationBell } from "./NotificationBell/NotificationBell";

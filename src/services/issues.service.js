@@ -15,6 +15,8 @@ import {
 import { db } from "../firebase";
 import { processNewIssue } from "./geminiSimilarity.service";
 import { withHostelFilter } from "../Lib/utilities";
+import { createNotification } from "./notificationService";
+import { applyRule3 } from "./escalationService";
 
 const ISSUES_COLLECTION = "issues";
 
@@ -170,7 +172,14 @@ const directInsertIssue = async (issueData, hostelId) => {
   });
   
   const newDoc = await getDoc(docRef);
-  return { isDuplicate: false, issue: { id: newDoc.id, ...newDoc.data() }, message: "Issue reported successfully!" };
+  const newIssue = { id: newDoc.id, ...newDoc.data() };
+
+  // Rule 3: Critical priority at creation → auto-assign to admin
+  if ((issueData.priority || "").toLowerCase() === "critical") {
+    applyRule3(newDoc.id, hostelId);
+  }
+
+  return { isDuplicate: false, issue: newIssue, message: "Issue reported successfully!" };
 };
 
 // Create a new issue with optional similarity detection
@@ -198,7 +207,9 @@ export const updateIssueStatus = async (id, status, changedBy, note = null) => {
   const currentIssue = issueSnap.data();
   const updateData = { status };
   
-  if (status === "resolved") {
+  // Set resolved_at when status changes to resolved OR closed
+  const statusLower = status.toLowerCase();
+  if (statusLower === "resolved" || statusLower === "closed") {
     updateData.resolved_at = new Date().toISOString();
   }
 
@@ -213,6 +224,18 @@ export const updateIssueStatus = async (id, status, changedBy, note = null) => {
     note: note ?? null,
     changed_at: new Date().toISOString(),
   });
+
+  // Notify issue reporter about status change (non-blocking)
+  if (currentIssue.created_by) {
+    createNotification(
+      currentIssue.created_by,
+      currentIssue.hostelId || null,
+      "status_change",
+      "Status Update",
+      `Your issue "${currentIssue.title || "Untitled"}" is now ${status}`,
+      id
+    );
+  }
 
   const updatedSnap = await getDoc(issueRef);
   return { id: updatedSnap.id, ...updatedSnap.data() };
@@ -238,8 +261,19 @@ export const assignIssue = async (issueId, caretakerId, assignedBy) => {
     changed_at: new Date().toISOString(),
   });
 
-  const updatedSnap = await getDoc(issueRef);
-  return { id: updatedSnap.id, ...updatedSnap.data() };
+  // Notify the assigned caretaker (non-blocking)
+  const issueSnap = await getDoc(issueRef);
+  const issueData = issueSnap.exists() ? issueSnap.data() : {};
+  createNotification(
+    caretakerId,
+    issueData.hostelId || null,
+    "assignment",
+    "New Assignment",
+    `You have been assigned: "${issueData.title || "Untitled"}"`,
+    issueId
+  );
+
+  return { id: issueSnap.id, ...issueData };
 };
 
 // Update issue priority

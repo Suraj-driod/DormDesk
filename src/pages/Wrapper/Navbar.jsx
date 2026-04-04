@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import NotificationBell from "../../components/core/NotificationBell/NotificationBell";
 
 export function Navbar({
   user,
@@ -83,7 +84,8 @@ export function Navbar({
         </div>
 
         {/* Right */}
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
+          <NotificationBell userId={user?.id} />
           <button
             type="button"
             onClick={onLogout}

@@ -23,7 +23,8 @@ const CATEGORIES = [
 const URGENCY_LEVELS = [
   { value: 'low', label: 'Low', color: 'bg-green-500' },
   { value: 'medium', label: 'Medium', color: 'bg-yellow-500' },
-  { value: 'high', label: 'High', color: 'bg-red-500' },
+  { value: 'high', label: 'High', color: 'bg-orange-500' },
+  { value: 'critical', label: 'Critical', color: 'bg-red-700' },
 ];
 
 // 3. Visibility (Matches issue_visibility_type Enum: 'Public', 'Private')

@@ -20,6 +20,7 @@ const STATUS_UPDATE_OPTIONS = [
 
 const PriorityDot = ({ priority }) => {
   const colorMap = {
+    critical: 'bg-red-700',
     emergency: 'bg-red-600',
     high: 'bg-red-500',
     medium: 'bg-orange-400',
@@ -252,7 +253,9 @@ const Assignment = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredData.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
+                    <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors group ${
+                      (item.priority || "").toLowerCase() === "critical" ? "border-l-4 border-l-red-500" : ""
+                    }`}>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
                           <span className="font-semibold text-gray-800 text-sm">{item.title}</span>
@@ -261,6 +264,11 @@ const Assignment = () => {
                               {item.category}
                             </span>
                             <PriorityDot priority={item.priority} />
+                            {item.escalated && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                Escalated
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs text-gray-500 mt-1 line-clamp-1">{item.description}</p>
                         </div>

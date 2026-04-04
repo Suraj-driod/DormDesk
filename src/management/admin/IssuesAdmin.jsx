@@ -17,6 +17,7 @@ import { useAlert } from "../../hooks/useAlert";
 // Priority Dot helper
 const PriorityDot = ({ priority }) => {
   const colorMap = {
+    critical: 'bg-red-700',
     emergency: 'bg-red-600',
     high: 'bg-red-500',
     medium: 'bg-orange-400',
@@ -328,7 +329,9 @@ const IssuesAdmin = () => {
                   {filteredData.map((issue) => (
                     <tr 
                       key={issue.id} 
-                      className="hover:bg-blue-50/30 transition-colors group"
+                      className={`hover:bg-blue-50/30 transition-colors group ${
+                        (issue.priority || "").toLowerCase() === "critical" ? "border-l-4 border-l-red-500" : ""
+                      }`}
                     >
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
@@ -340,6 +343,11 @@ const IssuesAdmin = () => {
                               {issue.category}
                             </span>
                             <PriorityDot priority={issue.priority} />
+                            {issue.escalated && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                                Escalated
+                              </span>
+                            )}
                             {issue.repost_count > 0 && (
                               <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 border border-purple-200">
                                 {issue.repost_count} reposts

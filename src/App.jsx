@@ -18,6 +18,7 @@ import IssuesAdmin from "./management/admin/IssuesAdmin";
 import AdminAnnouncement from "./management/admin/AdminAnnouncement";
 import AdminLost from "./management/admin/AdminLost";
 import AdminCases from "./management/admin/AdminCases";
+import AnalyticsDashboard from "./management/AnalyticsDashboard";
 
 // Management - Caretaker
 import Assignment from "./management/caretaker/Assignment";
@@ -96,6 +97,14 @@ function App() {
               element={
                 <RequireAdmin>
                   <AdminCases />
+                </RequireAdmin>
+              }
+            />
+            <Route
+              path="/admin/analytics"
+              element={
+                <RequireAdmin>
+                  <AnalyticsDashboard />
                 </RequireAdmin>
               }
             />

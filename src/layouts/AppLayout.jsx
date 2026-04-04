@@ -4,6 +4,7 @@ import {Navbar} from "../pages/Wrapper/Navbar";
 import {Sidebar} from "../pages/Wrapper/Sidebar";
 import {Footer} from "../pages/Wrapper/Footer";
 import { useAuth } from "../auth/AuthContext";
+import { runEscalationCheck } from "../services/escalationService";
 
 const AppLayout = () => {
   const { user, profile, logout } = useAuth(); 
@@ -39,6 +40,32 @@ const AppLayout = () => {
     await logout();
     navigate('/login', { replace: true });
   };
+
+  /* ----------------------------------------
+     Scheduled escalation check (admin only)
+     // Move to Firebase Cloud Function scheduled trigger in production
+  -----------------------------------------*/
+  useEffect(() => {
+    if (profile?.role !== "admin") return;
+
+    const hostelId = profile?.hostelId;
+    const adminUid = profile?.managementDocId || profile?.id;
+    if (!hostelId || !adminUid) return;
+
+    // Run immediately on mount
+    runEscalationCheck(hostelId, adminUid).catch((err) =>
+      console.error("Escalation check failed:", err)
+    );
+
+    // Re-run every 30 minutes
+    const intervalId = setInterval(() => {
+      runEscalationCheck(hostelId, adminUid).catch((err) =>
+        console.error("Scheduled escalation check failed:", err)
+      );
+    }, 30 * 60 * 1000);
+
+    return () => clearInterval(intervalId);
+  }, [profile]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F8F9FA]">
