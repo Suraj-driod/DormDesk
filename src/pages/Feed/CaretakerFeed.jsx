@@ -189,23 +189,12 @@ const CaretakerFeed = () => {
 
           const compList = await Promise.all(compSnap.docs.map(async (docSnap) => {
             const comp = docSnap.data();
-            
-            let authorName = "Anonymous";
-            if (comp.raised_by) {
-              try {
-                const profileRef = doc(db, "users", comp.raised_by);
-                const profileSnap = await getDoc(profileRef);
-                if (profileSnap.exists()) {
-                  authorName = profileSnap.data().name || "Anonymous";
-                }
-              } catch (e) {}
-            }
 
             return {
               id: docSnap.id,
               title: `${comp.complaint_type || "General"} Complaint`,
               content: comp.description,
-              author: authorName,
+              author: "Anonymous",
               timestamp: new Date(comp.created_at || Date.now()),
               status: comp.status,
               upvotes: 0,

@@ -30,7 +30,7 @@ const PostDetail = () => {
   const isIssue = type === "issue";
 
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [issue, setIssue] = useState(null);
   const [postEntity, setPostEntity] = useState(null);
   const [commentTree, setCommentTree] = useState([]);
@@ -164,7 +164,10 @@ const PostDetail = () => {
     }
     if (postEntity && POST_TYPES.includes(type)) {
       const e = postEntity;
-      const author = e.profile?.name || e.raised_by_profile?.name || e.reported_by_profile?.name || "Anonymous";
+      let author = e.profile?.name || e.raised_by_profile?.name || e.reported_by_profile?.name || "Anonymous";
+      if (type === "complaint" && profile?.role === "caretaker") {
+        author = "Anonymous";
+      }
       const status = e.status || "Published";
       return {
         title: type === "complaint" ? `${e.complaint_type || "General"} Complaint` : e.title,

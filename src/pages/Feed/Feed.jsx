@@ -222,7 +222,7 @@ const Feed = () => {
               id: comp.id,
               title: `${comp.complaint_type} Complaint`,
               content: comp.description,
-              author: comp.raised_by_profile?.name || "Anonymous",
+              author: profile?.role === 'caretaker' ? "Anonymous" : (comp.raised_by_profile?.name || "Anonymous"),
               timestamp: new Date(comp.created_at),
               status: comp.status,
               upvotes: 0,
