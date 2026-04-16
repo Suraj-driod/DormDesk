@@ -1,0 +1,156 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ────────────────────────────────────────────────────
+    // Helper functions
+    // ────────────────────────────────────────────────────
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Get the caller's management profile (for admin/caretaker checks)
+    function getManagement() {
+      return get(/databases/$(database)/documents/management/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getManagement().role == 'admin';
+    }
+
+    function isCaretaker() {
+      return isSignedIn() && getManagement().role == 'caretaker';
+    }
+
+    function isStaff() {
+      return isAdmin() || isCaretaker();
+    }
+
+    // Check that caller's hostelId matches the document's hostelId
+    function sameHostelAsDocument() {
+      return getManagement().hostelId == resource.data.hostelId;
+    }
+
+    function callerHostelId() {
+      return getManagement().hostelId;
+    }
+
+    // ────────────────────────────────────────────────────
+    // Activation Keys
+    // Read: anyone (for registration validation)
+    // Write: only authenticated user marking as used (update only, no create/delete)
+    // ────────────────────────────────────────────────────
+    match /activationKeys/{keyId} {
+      allow read: if true;
+      allow update: if isSignedIn()
+                    && request.resource.data.used == true
+                    && request.resource.data.usedBy == request.auth.uid;
+      allow create, delete: if false;
+    }
+
+    // ────────────────────────────────────────────────────
+    // Hostels
+    // Read: any authenticated user (for student dropdown)
+    // Create: any authenticated user (during admin registration)
+    // Update/Delete: only the admin whose UID matches adminUid
+    // ────────────────────────────────────────────────────
+    match /hostels/{hostelId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && resource.data.adminUid == request.auth.uid;
+    }
+
+    // ────────────────────────────────────────────────────
+    // Management (admin + caretaker profiles)
+    // Read: own document, or admin of same hostel
+    // Create: authenticated user (during admin registration) or admin of same hostel (caretaker creation)
+    // Update: own document, or admin of same hostel
+    // Delete: admin of same hostel only
+    // ────────────────────────────────────────────────────
+    match /management/{userId} {
+      allow read: if isOwner(userId) || (isAdmin() && sameHostelAsDocument());
+      allow create: if isSignedIn();
+      allow update: if isOwner(userId) || (isAdmin() && sameHostelAsDocument());
+      allow delete: if isAdmin() && sameHostelAsDocument();
+    }
+
+    // ────────────────────────────────────────────────────
+    // Users (student profiles)
+    // Read: own document, or staff of same hostel
+    // Create: self only (during registration)
+    // Update: self only
+    // ────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isOwner(userId) || (isStaff() && sameHostelAsDocument());
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false;
+    }
+
+    // ────────────────────────────────────────────────────
+    // Issues
+    // Read: staff of same hostel, or student whose hostelId matches
+    // Create: authenticated user (hostelId must be set)
+    // Update: staff of same hostel
+    // Delete: admin of same hostel
+    // ────────────────────────────────────────────────────
+    match /issues/{issueId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.hostelId != null;
+      allow update: if isSignedIn();
+      allow delete: if isAdmin() && sameHostelAsDocument();
+    }
+
+    // ────────────────────────────────────────────────────
+    // Announcements
+    // ────────────────────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.hostelId != null;
+      allow update, delete: if isAdmin() && sameHostelAsDocument();
+    }
+
+    // ────────────────────────────────────────────────────
+    // Lost & Found
+    // ────────────────────────────────────────────────────
+    match /lost_found/{itemId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.hostelId != null;
+      allow update: if isSignedIn();
+      allow delete: if isAdmin() && sameHostelAsDocument();
+    }
+
+    // ────────────────────────────────────────────────────
+    // Complaints
+    // ────────────────────────────────────────────────────
+    match /complaints/{complaintId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.hostelId != null;
+      allow update: if isSignedIn();
+      allow delete: if isAdmin() && sameHostelAsDocument();
+    }
+
+    // ────────────────────────────────────────────────────
+    // Votes, Comments, Status Logs, Notifications
+    // ────────────────────────────────────────────────────
+    match /votes/{voteId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /comments/{commentId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /issue_status_logs/{logId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /notifications/{notifId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

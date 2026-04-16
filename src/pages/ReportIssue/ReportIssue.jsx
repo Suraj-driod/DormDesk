@@ -69,6 +69,16 @@ const ReportIssue = () => {
     register('visibility', { required: 'Please select visibility' });
   }, [register]);
 
+  // Auto-fill location details from student profile
+  useEffect(() => {
+    if (profile) {
+      setValue('hostelName', profile.hostelName || '');
+      setValue('block', profile.blockName || '');
+      setValue('floor', profile.floor ? String(profile.floor) : '');
+      setValue('roomNumber', profile.flatNumber || '');
+    }
+  }, [profile, setValue]);
+
   const isInitialSectionComplete =
     Boolean((watchedTitle ?? '').trim()) &&
     Boolean((watchedDescription ?? '').trim()) &&
@@ -253,6 +263,7 @@ const ReportIssue = () => {
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                   Location Details
+                  <span className="text-xs font-normal text-[#00B8D4] bg-[#F0FEFF] px-2 py-0.5 rounded-full">Auto-filled from your profile</span>
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
@@ -262,8 +273,8 @@ const ReportIssue = () => {
                     <input
                       {...register('hostelName', { required: 'Hostel name is required' })}
                       type="text"
-                      placeholder="e.g., Krishna Hostel"
-                      className={`${inputStyles} ${errors.hostelName ? 'border-red-500' : ''}`}
+                      readOnly
+                      className={`${inputStyles} bg-gray-100 cursor-not-allowed ${errors.hostelName ? 'border-red-500' : ''}`}
                     />
                     {errors.hostelName && (
                       <span className="text-xs text-red-500 mt-1 ml-1">{errors.hostelName.message}</span>
@@ -276,8 +287,8 @@ const ReportIssue = () => {
                     <input
                       {...register('block', { required: 'Block is required' })}
                       type="text"
-                      placeholder="e.g., Block A"
-                      className={`${inputStyles} ${errors.block ? 'border-red-500' : ''}`}
+                      readOnly
+                      className={`${inputStyles} bg-gray-100 cursor-not-allowed ${errors.block ? 'border-red-500' : ''}`}
                     />
                     {errors.block && (
                       <span className="text-xs text-red-500 mt-1 ml-1">{errors.block.message}</span>
@@ -290,8 +301,8 @@ const ReportIssue = () => {
                     <input
                       {...register('floor', { required: 'Floor number is required' })}
                       type="text"
-                      placeholder="e.g., 2nd Floor"
-                      className={`${inputStyles} ${errors.floor ? 'border-red-500' : ''}`}
+                      readOnly
+                      className={`${inputStyles} bg-gray-100 cursor-not-allowed ${errors.floor ? 'border-red-500' : ''}`}
                     />
                     {errors.floor && (
                       <span className="text-xs text-red-500 mt-1 ml-1">{errors.floor.message}</span>
@@ -299,13 +310,13 @@ const ReportIssue = () => {
                   </div>
                   <div>
                     <label className="text-sm font-semibold text-gray-800 block mb-1 ml-1">
-                      Room Number
+                      Flat / Room Number
                     </label>
                     <input
                       {...register('roomNumber')}
                       type="text"
-                      placeholder="e.g., 204 (Optional)"
-                      className={inputStyles}
+                      readOnly
+                      className={`${inputStyles} bg-gray-100 cursor-not-allowed`}
                     />
                   </div>
                 </div>

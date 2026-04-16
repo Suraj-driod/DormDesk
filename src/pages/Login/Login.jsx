@@ -14,6 +14,9 @@ const Login = () => {
   // Get redirect path from location state or default to dashboard
   const from = location.state?.from?.pathname || "/";
 
+  // Check for disabled caretaker message
+  const disabledMessage = location.state?.disabledMessage || null;
+
   // Redirect if already logged in
   useEffect(() => {
     if (!loading && user) {
@@ -131,10 +134,12 @@ const Login = () => {
               autoComplete="current-password"
             />
 
-            {errors.general && (
-              <p className="text-red-500 text-sm text-center">
-                {errors.general}
-              </p>
+            {(errors.general || disabledMessage) && (
+              <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-center">
+                <p className="text-red-600 text-sm font-medium">
+                  {errors.general || disabledMessage}
+                </p>
+              </div>
             )}
 
             <div className="pt-2">

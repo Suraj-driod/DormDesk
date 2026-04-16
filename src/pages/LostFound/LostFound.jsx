@@ -39,6 +39,21 @@ const LostFound = () => {
     register('status', { required: 'Please select a status' });
   }, [register]);
 
+  // Auto-fill location from student profile
+  useEffect(() => {
+    if (profile) {
+      const parts = [
+        profile.hostelName,
+        profile.blockName,
+        profile.floor ? `Floor ${profile.floor}` : null,
+        profile.flatNumber ? `Flat ${profile.flatNumber}` : null,
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        setValue('location', parts.join(', '));
+      }
+    }
+  }, [profile, setValue]);
+
   // --- SUBMIT HANDLER ---
   const onSubmit = async (data) => {
     if (!user) {

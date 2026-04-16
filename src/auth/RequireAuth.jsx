@@ -21,7 +21,8 @@ export const RequireAuth = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!profile?.hostelId) {
+  // Hostel guard — only for students. Admins/caretakers are never blocked here.
+  if (profile?.role === "student" && !profile?.hostelId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-6">
         <div className="bg-white p-10 rounded-3xl shadow-lg border border-red-100 text-center max-w-md">

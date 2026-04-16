@@ -43,39 +43,54 @@ export const AuthProvider = ({ children }) => {
     const userEmail = firebaseUser.email;
 
     try {
-      // Always check management collection first (for staff accounts)
-      if (userEmail) {
+      // ── 1. Check management collection by UID first (admin registration writes management/{uid}) ──
+      const mgmtDocRef = doc(db, "management", userId);
+      const mgmtDocSnap = await getDoc(mgmtDocRef);
+
+      let mgmtDoc = null;
+      let mgmtData = null;
+
+      if (mgmtDocSnap.exists()) {
+        mgmtDoc = mgmtDocSnap;
+        mgmtData = mgmtDocSnap.data();
+      } else if (userEmail) {
+        // Fallback: query by email (for legacy caretaker docs that may use a different doc ID)
         const mgmtRef = collection(db, "management");
         const q = query(mgmtRef, where("email", "==", userEmail));
         const mgmtSnap = await getDocs(q);
 
         if (!mgmtSnap.empty) {
-          const mgmtDoc = mgmtSnap.docs[0];
-          const mgmtData = mgmtDoc.data();
-
-          // Check for various field name conventions (isActive, is_active, active)
-          // Also handle string "true" vs boolean true
-          const isActiveValue =
-            mgmtData.isActive ?? mgmtData.is_active ?? mgmtData.active;
-          const isActive = isActiveValue === true || isActiveValue === "true";
-
-          if (isActive) {
-            return {
-              id: userId,
-              email: userEmail,
-              managementDocId: mgmtDoc.id,
-              ...mgmtData,
-              role: mgmtData.role, // "admin" or "caretaker"
-              name:
-                mgmtData.full_name || mgmtData.name || userEmail.split("@")[0],
-              hostelId: mgmtData.hostelId || null,
-            };
-          }
-          // Staff account exists but is not active - deny access
-          throw new Error(
-            "Your staff account is not active. Please contact your administrator.",
-          );
+          mgmtDoc = mgmtSnap.docs[0];
+          mgmtData = mgmtDoc.data();
         }
+      }
+
+      // ── If found in management → return admin/caretaker profile immediately ──
+      if (mgmtDoc && mgmtData) {
+        // Check for various field name conventions (isActive, is_active, active)
+        // Also handle string "true" vs boolean true
+        const isActiveValue =
+          mgmtData.isActive ?? mgmtData.is_active ?? mgmtData.active;
+        const isActive = isActiveValue === true || isActiveValue === "true";
+
+        if (isActive) {
+          return {
+            id: userId,
+            email: userEmail,
+            managementDocId: mgmtDoc.id,
+            ...mgmtData,
+            role: mgmtData.role, // "admin" or "caretaker"
+            name:
+              mgmtData.full_name || mgmtData.name || userEmail.split("@")[0],
+            hostelId: mgmtData.hostelId || null,
+            hostelName: mgmtData.hostelName || null,
+            blockName: mgmtData.blockName || null,
+          };
+        }
+        // Staff account exists but is not active - deny access
+        throw new Error(
+          "Your staff account is not active. Please contact your administrator.",
+        );
       }
 
       // Not in management collection, check users collection (student)
@@ -90,6 +105,10 @@ export const AuthProvider = ({ children }) => {
           ...userData,
           role: "student",
           hostelId: userData.hostelId || null,
+          hostelName: userData.hostelName || null,
+          blockName: userData.blockName || null,
+          floor: userData.floor || null,
+          flatNumber: userData.flatNumber || null,
         };
       }
 
@@ -228,20 +247,21 @@ export const AuthProvider = ({ children }) => {
       if (result.user) {
         // Update display name
         await updateProfile(result.user, {
-          displayName: metadata?.fullName || email.split("@")[0],
+          displayName: metadata?.fullName || metadata?.name || email.split("@")[0],
         });
 
         // Create user document in users collection (always as student)
         const userRef = doc(db, "users", result.user.uid);
         await setDoc(userRef, {
-          name: metadata?.fullName || email.split("@")[0],
+          name: metadata?.fullName || metadata?.name || email.split("@")[0],
           email: email,
           role: "student",
           hostelId: metadata?.hostelId || null,
-          block: metadata?.block || null,
-          floor: metadata?.floor || null,
-          room_no: metadata?.room_no || null,
-          phone_no: metadata?.phone_no || null,
+          hostelName: metadata?.hostelName || null,
+          blockName: metadata?.blockName || null,
+          floor: metadata?.floor ? Number(metadata.floor) : null,
+          flatNumber: metadata?.flatNumber || null,
+          phone_no: metadata?.phone_no || metadata?.phone || null,
           created_at: new Date().toISOString(),
         });
 

@@ -2,7 +2,7 @@ import { Navigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 
 export const RequireCaretaker = ({ children }) => {
-  const { user, profile, loading, isCaretaker } = useAuth();
+  const { user, profile, loading, isCaretaker, logout } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -32,6 +32,21 @@ export const RequireCaretaker = ({ children }) => {
           </p>
         </div>
       </div>
+    );
+  }
+
+  // ── STEP 4: Block disabled caretakers ──
+  if (profile?.disabled === true) {
+    // Sign them out and redirect
+    logout().then(() => {});
+    return (
+      <Navigate
+        to="/login"
+        state={{
+          disabledMessage: "Your account has been disabled. Contact your admin.",
+        }}
+        replace
+      />
     );
   }
 

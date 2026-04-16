@@ -61,6 +61,11 @@ const Complaint = () => {
         description: data.description,
         accused_user: data.accusedName,
         media: mediaArray,
+        // Auto-attach hostel location from profile
+        hostelName: profile?.hostelName || '',
+        blockName: profile?.blockName || '',
+        floor: profile?.floor || null,
+        flatNumber: profile?.flatNumber || '',
       }, user.uid, profile?.hostelId);
 
       showSuccess('Complaint submitted successfully!', {
@@ -175,6 +180,23 @@ const Complaint = () => {
               <span className="text-xs text-red-500 mt-1 ml-1">{errors.description.message}</span>
             )}
           </div>
+
+          {/* Location (auto-filled from profile) */}
+          {profile?.hostelName && (
+            <div className="mb-5">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2 ml-1">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                Your Location
+                <span className="text-xs font-normal text-[#00B8D4] bg-[#F0FEFF] px-2 py-0.5 rounded-full">Auto-filled</span>
+              </h3>
+              <div className={`${inputStyles} bg-gray-100 cursor-not-allowed text-gray-600`}>
+                {[profile.hostelName, profile.blockName, profile.floor ? `Floor ${profile.floor}` : null, profile.flatNumber ? `Flat ${profile.flatNumber}` : null].filter(Boolean).join(' · ')}
+              </div>
+            </div>
+          )}
 
           {/* Media Upload */}
           <div className="mb-5">
