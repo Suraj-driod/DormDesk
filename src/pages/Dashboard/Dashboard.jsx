@@ -8,6 +8,7 @@ import {
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../auth/AuthContext";
+import { withHostelFilter } from "../../Lib/utilities";
 import Heatmap from "../../components/Heatmap/Heatmap";
 import QuickReportFAB from "../../components/QuickReportFAB/QuickReportFAB";
 
@@ -47,9 +48,12 @@ export default function Dashboard() {
 
   const fetchSlideData = async () => {
     try {
-      // Fetch all issues, filter/sort client-side to avoid composite index
+      const hostelId = profile?.hostelId;
+
+      // Fetch issues scoped by hostel
       const issuesRef = collection(db, "issues");
-      const issuesSnap = await getDocs(issuesRef);
+      const issuesQ = hostelId ? withHostelFilter(issuesRef, hostelId) : issuesRef;
+      const issuesSnap = await getDocs(issuesQ);
       const allIssues = issuesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       
       // Get top public issue (most recent)
@@ -58,17 +62,19 @@ export default function Dashboard() {
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       const topIssue = publicIssues[0] || null;
 
-      // Fetch latest announcement
+      // Fetch announcements scoped by hostel
       const announcementsRef = collection(db, "announcements");
-      const annSnap = await getDocs(announcementsRef);
+      const annQ = hostelId ? withHostelFilter(announcementsRef, hostelId) : announcementsRef;
+      const annSnap = await getDocs(annQ);
       const allAnnouncements = annSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
       const latestAnnouncement = allAnnouncements[0] || null;
 
-      // Fetch recent lost item
+      // Fetch lost items scoped by hostel
       const lostRef = collection(db, "lost_found");
-      const lostSnap = await getDocs(lostRef);
+      const lostQ = hostelId ? withHostelFilter(lostRef, hostelId) : lostRef;
+      const lostSnap = await getDocs(lostQ);
       const lostItems = lostSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(i => i.status === "lost")
@@ -379,8 +385,8 @@ export default function Dashboard() {
               {[
                 { label: "Manage Issues", path: "/admin/issues" },
                 { label: "Announcements", path: "/admin/announcements" },
-                { label: "Lost & Found", path: "/admin/lost" },
-                { label: "Case Assignment", path: "/admin/cases" },
+                { label: "Residents", path: "/admin/residents" },
+                { label: "Caretakers", path: "/admin/caretakers" },
               ].map((item) => (
                 <button
                   key={item.path}

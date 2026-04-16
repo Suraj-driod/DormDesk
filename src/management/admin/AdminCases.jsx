@@ -61,7 +61,7 @@ const AdminCases = () => {
     try {
       const [issuesData, caretakersData] = await Promise.all([
         fetchIssues({}, profile?.hostelId),
-        fetchCaretakers(),
+        fetchCaretakers(profile?.hostelId),
       ]);
       setCases(issuesData || []);
       setCaretakers(caretakersData || []);

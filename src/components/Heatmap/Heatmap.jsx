@@ -4,6 +4,7 @@ import { Wifi, Wrench, Zap, Sparkles, HelpCircle, TrendingUp } from "lucide-reac
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../auth/AuthContext";
+import { withHostelFilter } from "../../Lib/utilities";
 
 const CATEGORY_CONFIG = {
   wifi: { 
@@ -44,7 +45,7 @@ const CATEGORY_CONFIG = {
 };
 
 const Heatmap = ({ compact = false }) => {
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [categoryStats, setCategoryStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalIssues, setTotalIssues] = useState(0);
@@ -83,7 +84,9 @@ const Heatmap = ({ compact = false }) => {
     setLoading(true);
     try {
       const issuesRef = collection(db, "issues");
-      const snapshot = await getDocs(issuesRef);
+      const hostelId = profile?.hostelId;
+      const q = hostelId ? withHostelFilter(issuesRef, hostelId) : issuesRef;
+      const snapshot = await getDocs(q);
 
       if (!isMountedRef.current) return;
 

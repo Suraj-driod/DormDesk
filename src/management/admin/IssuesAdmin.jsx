@@ -77,7 +77,7 @@ const IssuesAdmin = () => {
 
   const loadCaretakers = async () => {
     try {
-      const data = await fetchCaretakers();
+      const data = await fetchCaretakers(profile?.hostelId);
       setCaretakers(data || []);
     } catch (error) {
       console.error("Error loading caretakers:", error);

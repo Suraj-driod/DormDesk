@@ -26,6 +26,8 @@ export function Sidebar({
         { key: "/admin/announcements", label: "Announcements", icon: Megaphone },
         { key: "/admin/lost", label: "Lost & Found", icon: Search },
         { key: "/admin/cases", label: "Case Assignment", icon: Briefcase },
+        { key: "/admin/residents", label: "Residents", icon: Users },
+        { key: "/admin/caretakers", label: "Caretakers", icon: Settings },
         { key: "/feed", label: "Public Feed", icon: Eye },
         { key: "/profile", label: "Profile", icon: User },
       ];

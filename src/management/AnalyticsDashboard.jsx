@@ -251,7 +251,7 @@ const AnalyticsDashboard = () => {
     try {
       const [issueData, caretakerData] = await Promise.all([
         fetchAllIssuesForAnalytics(hostelId),
-        fetchAllCaretakers(),
+        fetchAllCaretakers(hostelId),
       ]);
 
       setIssues(issueData);

@@ -7,8 +7,9 @@ import {
 import { useAuth } from "../auth/AuthContext";
 import { AlertModal } from "../UI/Glow";
 import { useAlert } from "../hooks/useAlert";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../firebase";
+import { initializeApp, deleteApp } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import app from "../firebase";
 import {
   createCaretakerDoc,
   fetchCaretakersByHostel,
@@ -78,10 +79,18 @@ const CaretakerPortal = () => {
     if (Object.keys(errs).length) { setFormErrors(errs); setCreating(false); return; }
 
     try {
-      // 1. Create Firebase Auth account for caretaker
-      //    NOTE: This will sign in as the new user on the client.
-      //    We save the current user's token first for re-auth if needed.
-      const result = await createUserWithEmailAndPassword(auth, form.email, form.password);
+      // Use a secondary Firebase app so the admin's auth session is NOT affected.
+      // createUserWithEmailAndPassword on the primary app would sign in as the new user.
+      const secondaryApp = initializeApp(app.options, "caretaker-creator");
+      const secondaryAuth = getAuth(secondaryApp);
+
+      let result;
+      try {
+        result = await createUserWithEmailAndPassword(secondaryAuth, form.email, form.password);
+      } finally {
+        // Always clean up the secondary app
+        await deleteApp(secondaryApp);
+      }
 
       // 2. Write caretaker doc to management collection
       await createCaretakerDoc(result.user.uid, {
@@ -100,11 +109,6 @@ const CaretakerPortal = () => {
 
       // Refresh list
       loadCaretakers();
-
-      // NOTE: createUserWithEmailAndPassword switches the auth state to the new user.
-      // The admin will be logged out. We need to inform them.
-      // In a production app you'd use Firebase Admin SDK server-side.
-      // Since we're client-only, the admin will need to re-login.
 
     } catch (error) {
       let msg = "Failed to create caretaker.";
@@ -235,7 +239,7 @@ const CaretakerPortal = () => {
                       </div>
                       <div className="flex items-start gap-1.5 mt-3 text-xs text-amber-700 bg-amber-50 rounded-lg p-2 border border-amber-100">
                         <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                        <span><strong>Important:</strong> Creating a caretaker account will sign you out. Please log back in with your admin credentials. Also note the password above — it won't be shown again.</span>
+                        <span><strong>Important:</strong> Save these credentials — the password won't be shown again. Share them securely with the caretaker.</span>
                       </div>
                     </div>
                   </motion.div>

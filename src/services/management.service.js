@@ -147,15 +147,24 @@ export const deleteCaretaker = async (id) => {
   }
 };
 
-// Fetch all caretakers
-export const fetchAllCaretakers = async () => {
+// Fetch all caretakers (optionally scoped by hostelId)
+export const fetchAllCaretakers = async (hostelId = null) => {
   try {
     const mgmtRef = collection(db, MANAGEMENT_COLLECTION);
-    const q = query(
-      mgmtRef,
-      where("role", "==", "caretaker"),
-      orderBy("full_name")
-    );
+    let q;
+    if (hostelId) {
+      q = query(
+        mgmtRef,
+        where("role", "==", "caretaker"),
+        where("hostelId", "==", hostelId)
+      );
+    } else {
+      q = query(
+        mgmtRef,
+        where("role", "==", "caretaker"),
+        orderBy("full_name")
+      );
+    }
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
@@ -165,16 +174,26 @@ export const fetchAllCaretakers = async () => {
   }
 };
 
-// Fetch active caretakers
-export const fetchActiveCaretakers = async () => {
+// Fetch active caretakers (optionally scoped by hostelId)
+export const fetchActiveCaretakers = async (hostelId = null) => {
   try {
     const mgmtRef = collection(db, MANAGEMENT_COLLECTION);
-    const q = query(
-      mgmtRef,
-      where("role", "==", "caretaker"),
-      where("is_active", "==", true),
-      orderBy("full_name")
-    );
+    let q;
+    if (hostelId) {
+      q = query(
+        mgmtRef,
+        where("role", "==", "caretaker"),
+        where("isActive", "==", true),
+        where("hostelId", "==", hostelId)
+      );
+    } else {
+      q = query(
+        mgmtRef,
+        where("role", "==", "caretaker"),
+        where("is_active", "==", true),
+        orderBy("full_name")
+      );
+    }
     const snapshot = await getDocs(q);
 
     return snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));

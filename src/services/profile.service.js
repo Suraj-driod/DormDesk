@@ -193,7 +193,7 @@ export const updateAvatarUrl = async (userId, avatarUrl, role, userEmail = null)
 };
 
 // Fetch all caretakers (for admin assignment)
-export const fetchCaretakers = async () => {
+export const fetchCaretakers = async (hostelId = null) => {
   try {
     const mgmtRef = collection(db, "management");
     // Fetch all, filter client-side to avoid composite index
@@ -201,7 +201,11 @@ export const fetchCaretakers = async () => {
 
     return snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(m => m.role === "caretaker" && m.is_active !== false)
+      .filter(m => 
+        m.role === "caretaker" && 
+        m.is_active !== false &&
+        (!hostelId || m.hostelId === hostelId)
+      )
       .sort((a, b) => (a.full_name || "").localeCompare(b.full_name || ""));
   } catch (error) {
     console.error("Error fetching caretakers:", error);
