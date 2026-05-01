@@ -18,6 +18,7 @@ import { withHostelFilter } from "../Lib/utilities";
 import { createNotification } from "./notificationService";
 import { applyRule3 } from "./escalationService";
 import { uploadMedia } from "./mediaService";
+import { emailOnIssueReported, emailOnIssueAssigned, emailOnIssueResolved } from "./emailService";
 
 const ISSUES_COLLECTION = "issues";
 
@@ -180,6 +181,9 @@ const directInsertIssue = async (issueData, hostelId) => {
     applyRule3(newDoc.id, hostelId);
   }
 
+  // Email admin (non-blocking)
+  emailOnIssueReported(newIssue).catch(() => {});
+
   return { isDuplicate: false, issue: newIssue, message: "Issue reported successfully!" };
 };
 
@@ -274,7 +278,11 @@ export const assignIssue = async (issueId, caretakerId, assignedBy) => {
     issueId
   );
 
-  return { id: issueSnap.id, ...issueData };
+  // Email caretaker (non-blocking)
+  const fullIssue = { id: issueSnap.id, ...issueData };
+  emailOnIssueAssigned(fullIssue, caretakerId).catch(() => {});
+
+  return fullIssue;
 };
 
 // Update issue priority
@@ -562,7 +570,12 @@ export const approveResolutionProof = async (issueId, adminUid) => {
   }
 
   const updatedSnap = await getDoc(issueRef);
-  return { id: updatedSnap.id, ...updatedSnap.data() };
+  const resolvedIssue = { id: updatedSnap.id, ...updatedSnap.data() };
+
+  // Email student (non-blocking)
+  emailOnIssueResolved(resolvedIssue).catch(() => {});
+
+  return resolvedIssue;
 };
 
 export const rejectResolutionProof = async (issueId, adminUid, reason) => {
