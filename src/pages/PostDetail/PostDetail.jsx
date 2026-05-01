@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Star, ThumbsUp, ThumbsDown, CheckCircle, Image as ImageIcon } from "lucide-react";
 import PostDetailBase from "../../components/core/PostDetailBase/PostDetailBase";
 import MediaRenderer from "../../components/core/MediaRenderer/MediaRenderer";
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { getStatusTimeline, getAnnouncementTimeline, getLostItemTimeline, getComplaintTimeline } from "../../utils/statusTimeline";
 import { useAuth } from "../../auth/AuthContext";
-import { fetchIssueById } from "../../services/issues.service";
+import { fetchIssueById, submitIssueFeedback } from "../../services/issues.service";
 import { fetchAnnouncementById } from "../../services/announcements.service";
 import { fetchLostItemById } from "../../services/lostItems.service";
 import { fetchComplaintById } from "../../services/complaints.service";
@@ -199,6 +199,37 @@ const PostDetail = () => {
 
   const totalComments = useMemo(() => countCommentTree(commentTree), [commentTree]);
 
+  // ── Feedback form state ─────────────────────────────────────────────────────
+  const [fbRating, setFbRating] = useState(0);
+  const [fbHover, setFbHover] = useState(0);
+  const [fbSatisfaction, setFbSatisfaction] = useState(null);
+  const [fbComment, setFbComment] = useState("");
+  const [fbSubmitting, setFbSubmitting] = useState(false);
+  const [fbError, setFbError] = useState("");
+
+  const canGiveFeedback = isIssue && issue && user?.uid === issue.created_by && issue.status === "resolved" && !issue.feedbackGiven;
+  const showProof = isIssue && issue?.proofUrl && ["resolved", "closed"].includes(issue.status);
+  const showFeedbackSummary = isIssue && issue?.feedbackGiven && issue?.feedback;
+
+  const handleFeedbackSubmit = async () => {
+    if (!fbRating) { setFbError("Please select a rating"); return; }
+    if (!fbSatisfaction) { setFbError("Please select satisfaction"); return; }
+    setFbError("");
+    setFbSubmitting(true);
+    try {
+      const updated = await submitIssueFeedback(issue.id, user.uid, {
+        rating: fbRating,
+        satisfaction: fbSatisfaction,
+        comment: fbComment,
+      });
+      setIssue((prev) => ({ ...prev, ...updated }));
+    } catch (err) {
+      setFbError(err.message || "Failed to submit feedback");
+    } finally {
+      setFbSubmitting(false);
+    }
+  };
+
   if (loading && !issue && !postEntity) {
     return (
       <div className="min-h-screen bg-[#F8F9FA] flex flex-col items-center justify-center">
@@ -219,6 +250,142 @@ const PostDetail = () => {
     );
   }
 
+  const feedbackSlot = (
+    <>
+      {/* Proof preview */}
+      {showProof && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+          <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+            <ImageIcon size={16} className="text-teal-500" /> Proof of Resolution
+          </h3>
+          <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+            {issue.proofSubmission?.resourceType === "video" ? (
+              <video src={issue.proofUrl} controls className="w-full max-h-[300px]" />
+            ) : (
+              <img src={issue.proofUrl} alt="Proof" className="w-full max-h-[300px] object-contain" />
+            )}
+          </div>
+          {issue.proofSubmission?.comment && (
+            <p className="text-xs text-gray-500 mt-2 italic">"{issue.proofSubmission.comment}"</p>
+          )}
+        </div>
+      )}
+
+      {/* Feedback form */}
+      {canGiveFeedback && (
+        <div className="bg-gradient-to-br from-[#F0FEFF] to-white rounded-2xl border border-[#B2EBF2] shadow-sm p-5 mb-4">
+          <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Star size={16} className="text-amber-500" /> Give Feedback
+          </h3>
+
+          {/* Stars */}
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2 font-medium">How would you rate the resolution?</p>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setFbRating(i)}
+                  onMouseEnter={() => setFbHover(i)}
+                  onMouseLeave={() => setFbHover(0)}
+                  className="transition-transform hover:scale-110"
+                >
+                  <Star
+                    size={28}
+                    className={i <= (fbHover || fbRating) ? "text-amber-400 fill-amber-400" : "text-gray-300"}
+                  />
+                </button>
+              ))}
+              {fbRating > 0 && <span className="ml-2 text-sm text-gray-500 self-center">{fbRating}/5</span>}
+            </div>
+          </div>
+
+          {/* Satisfaction */}
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2 font-medium">Are you satisfied with the resolution?</p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setFbSatisfaction("satisfied")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  fbSatisfaction === "satisfied"
+                    ? "border-green-400 bg-green-50 text-green-700"
+                    : "border-gray-200 text-gray-500 hover:border-green-300"
+                }`}
+              >
+                <ThumbsUp size={16} /> Satisfied
+              </button>
+              <button
+                type="button"
+                onClick={() => setFbSatisfaction("not_satisfied")}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  fbSatisfaction === "not_satisfied"
+                    ? "border-red-400 bg-red-50 text-red-700"
+                    : "border-gray-200 text-gray-500 hover:border-red-300"
+                }`}
+              >
+                <ThumbsDown size={16} /> Not Satisfied
+              </button>
+            </div>
+          </div>
+
+          {/* Comment */}
+          <div className="mb-4">
+            <textarea
+              value={fbComment}
+              onChange={(e) => setFbComment(e.target.value)}
+              placeholder="Any additional comments... (optional)"
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#00E5FF]/30 focus:border-[#00E5FF] transition-all"
+              rows={3}
+            />
+          </div>
+
+          {fbError && <p className="text-xs text-red-500 mb-3">{fbError}</p>}
+
+          <button
+            type="button"
+            onClick={handleFeedbackSubmit}
+            disabled={fbSubmitting}
+            className="w-full px-4 py-3 bg-gradient-to-r from-[#00E5FF] to-[#00B8D4] text-white font-semibold text-sm rounded-xl hover:shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+          >
+            {fbSubmitting ? (
+              <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            ) : (
+              <CheckCircle size={16} />
+            )}
+            Submit Feedback
+          </button>
+        </div>
+      )}
+
+      {/* Already-submitted feedback summary */}
+      {showFeedbackSummary && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+          <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
+            <Star size={16} className="text-amber-500 fill-amber-500" /> Your Feedback
+          </h3>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Star key={i} size={16} className={i <= issue.feedback.rating ? "text-amber-400 fill-amber-400" : "text-gray-200"} />
+              ))}
+            </div>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+              issue.feedback.satisfaction === "satisfied"
+                ? "bg-green-100 text-green-700"
+                : "bg-red-100 text-red-700"
+            }`}>
+              {issue.feedback.satisfaction === "satisfied" ? "Satisfied" : "Not Satisfied"}
+            </span>
+          </div>
+          {issue.feedback.comment && <p className="text-sm text-gray-600">{issue.feedback.comment}</p>}
+          <p className="text-xs text-gray-400 mt-2">Submitted {new Date(issue.feedback.submittedAt).toLocaleString()}</p>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <PostDetailBase
       post={post}
@@ -227,6 +394,7 @@ const PostDetail = () => {
       onCommentSubmit={handleCommentSubmit}
       onCommentUpvote={isIssue ? handleCommentUpvote : undefined}
       onBack={() => navigate(-1)}
+      postSlot={feedbackSlot}
     />
   );
 };

@@ -1,21 +1,21 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Filter, CheckCircle, Clock, 
-  Globe, Lock, AlertCircle, XCircle, RefreshCw, ShieldCheck
+  Globe, Lock, AlertCircle, XCircle, RefreshCw, ShieldCheck, Upload, X, Camera
 } from "lucide-react";
 
 import { SelectBetter } from "../../UI/SelectBetter"; 
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { AlertModal } from "../../UI/Glow";
-import { fetchAssignedIssues, updateIssueStatus } from "../../services/issues.service";
+import { fetchAssignedIssues, updateIssueStatus, submitResolutionProof } from "../../services/issues.service";
+import { validateMedia, detectMediaCategory } from "../../services/mediaService";
 import { useAuth } from "../../auth/AuthContext";
 import { useAlert } from "../../hooks/useAlert";
 
 const STATUS_UPDATE_OPTIONS = [
   { value: 'assigned', label: 'Assigned' },
   { value: 'in_progress', label: 'In Progress' },
-  { value: 'resolved', label: 'Resolved' }
 ];
 
 const PriorityDot = ({ priority }) => {
@@ -90,9 +90,62 @@ const Assignment = () => {
     }
   };
 
+  // Proof modal state
+  const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [proofIssue, setProofIssue] = useState(null);
+  const [proofFile, setProofFile] = useState(null);
+  const [proofPreview, setProofPreview] = useState(null);
+  const [proofComment, setProofComment] = useState("");
+  const [proofSubmitting, setProofSubmitting] = useState(false);
+  const [proofError, setProofError] = useState("");
+  const proofFileRef = useRef(null);
+
+  const openProofModal = (issue) => {
+    setProofIssue(issue);
+    setProofFile(null);
+    setProofPreview(null);
+    setProofComment("");
+    setProofError("");
+    setProofModalOpen(true);
+  };
+
+  const handleProofFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validation = validateMedia(file);
+    if (!validation.valid) {
+      setProofError(validation.error);
+      return;
+    }
+    setProofError("");
+    setProofFile(file);
+    const category = detectMediaCategory(file);
+    if (category === "image") {
+      setProofPreview(URL.createObjectURL(file));
+    } else {
+      setProofPreview(null);
+    }
+  };
+
+  const handleProofSubmit = async () => {
+    if (!proofFile) { setProofError("Please upload proof (image or video)"); return; }
+    setProofSubmitting(true);
+    try {
+      const updated = await submitResolutionProof(proofIssue.id, { file: proofFile, comment: proofComment }, caretakerId);
+      setAssignments(prev => prev.map(item =>
+        item.id === proofIssue.id ? { ...item, ...updated } : item
+      ));
+      setProofModalOpen(false);
+      showSuccess("Proof submitted! Awaiting admin approval.");
+    } catch (err) {
+      console.error("Error submitting proof:", err);
+      showError(err.message || "Failed to submit proof");
+    } finally {
+      setProofSubmitting(false);
+    }
+  };
+
   const handleStatusUpdate = async (id, newStatus) => {
-    if (newStatus === 'resolved' && !window.confirm("Mark this job as completed?")) return;
-    
     try {
       await updateIssueStatus(id, newStatus, user?.uid);
       setAssignments(prev => prev.map(item => 
@@ -246,6 +299,7 @@ const Assignment = () => {
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Location</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Reported By</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase">Proof</th>
                     {activeTab !== 'completed' && (
                       <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase text-right">Quick Update</th>
                     )}
@@ -299,6 +353,24 @@ const Assignment = () => {
                         <BadgeBetter1 status={item.status} />
                       </td>
 
+                      <td className="px-6 py-4">
+                        {item.proofSubmission?.status === "pending" && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">
+                            Proof Pending Review
+                          </span>
+                        )}
+                        {item.proofSubmission?.status === "rejected" && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200" title={item.proofSubmission.rejectionReason}>
+                            Proof Rejected
+                          </span>
+                        )}
+                        {item.proofSubmission?.status === "approved" && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                            Proof Approved
+                          </span>
+                        )}
+                      </td>
+
                       {activeTab !== 'completed' && (
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end items-center gap-2">
@@ -319,6 +391,16 @@ const Assignment = () => {
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                               ))}
                             </select>
+
+                            <button
+                              onClick={() => openProofModal(item)}
+                              disabled={item.proofSubmission?.status === "pending"}
+                              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                              title="Submit proof of completed work"
+                            >
+                              <Camera size={14} />
+                              Submit Proof
+                            </button>
                           </div>
                         </td>
                       )}
@@ -330,6 +412,135 @@ const Assignment = () => {
           )}
         </div>
       </div>
+
+      {/* ── Proof Submission Modal ────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {proofModalOpen && proofIssue && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setProofModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 10 }}
+              transition={{ type: "spring", bounce: 0.25, duration: 0.35 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
+                    <Upload size={20} className="text-teal-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-800">Submit Proof</h2>
+                    <p className="text-xs text-gray-400">Upload proof of completed work</p>
+                  </div>
+                </div>
+                <button onClick={() => setProofModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={18} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-100">
+                <p className="text-xs text-gray-500 mb-1 font-medium uppercase tracking-wide">Issue</p>
+                <p className="font-semibold text-gray-800 text-sm">{proofIssue.title}</p>
+                <p className="text-xs text-gray-500 mt-1">{proofIssue.hostel} · Block {proofIssue.block} · {proofIssue.room_no}</p>
+              </div>
+
+              <div className="px-6 py-5 space-y-4">
+                {/* File upload */}
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">
+                    Proof (image or video) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    ref={proofFileRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleProofFileChange}
+                    className="hidden"
+                  />
+                  {proofFile ? (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      {proofPreview && (
+                        <img src={proofPreview} alt="Preview" className="w-full max-h-48 object-cover" />
+                      )}
+                      <div className="flex items-center justify-between p-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-gray-700 truncate">{proofFile.name}</p>
+                          <p className="text-xs text-gray-400">{(proofFile.size / (1024 * 1024)).toFixed(1)} MB</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setProofFile(null); setProofPreview(null); }}
+                          className="p-1.5 rounded-full bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => proofFileRef.current?.click()}
+                      className="w-full border-2 border-dashed border-teal-300 bg-teal-50/50 hover:bg-teal-50 rounded-xl py-8 flex flex-col items-center gap-2 transition-colors"
+                    >
+                      <Camera size={28} className="text-teal-500" />
+                      <span className="text-sm text-gray-600"><span className="text-teal-600 font-semibold">Click to upload</span> photo or video</span>
+                      <span className="text-xs text-gray-400">jpg, png, webp, mp4 — max 50MB</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Comment */}
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 block mb-2">Comment (optional)</label>
+                  <textarea
+                    value={proofComment}
+                    onChange={(e) => setProofComment(e.target.value)}
+                    placeholder="Describe the work done..."
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-200 focus:border-teal-400 transition-all"
+                    rows={3}
+                  />
+                </div>
+
+                {proofError && <p className="text-xs text-red-500">{proofError}</p>}
+              </div>
+
+              <div className="px-6 pb-6 flex gap-3">
+                <button
+                  onClick={() => setProofModalOpen(false)}
+                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl font-medium text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleProofSubmit}
+                  disabled={!proofFile || proofSubmitting}
+                  className="flex-1 px-4 py-3 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {proofSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} />
+                      Submit Proof
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -93,15 +93,21 @@ service cloud.firestore {
 
     // ────────────────────────────────────────────────────
     // Issues
-    // Read: staff of same hostel, or student whose hostelId matches
+    // Read: any signed-in user
     // Create: authenticated user (hostelId must be set)
-    // Update: staff of same hostel
+    // Update: staff (admin/caretaker) for operational fields,
+    //         OR the reporter (created_by) for feedback submission
     // Delete: admin of same hostel
     // ────────────────────────────────────────────────────
     match /issues/{issueId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.hostelId != null;
-      allow update: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isStaff()
+        || (resource.data.created_by == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['feedback', 'feedbackGiven']))
+      );
       allow delete: if isAdmin() && sameHostelAsDocument();
     }
 

@@ -9,6 +9,7 @@ import {
   Loader2,
   Lock,
   Globe,
+  Star,
 } from "lucide-react";
 
 import PostBase from "../../components/core/PostBase/PostBase";
@@ -133,6 +134,7 @@ const MyIssues = () => {
               priority: issue.priority,
               repostCount: issue.repost_count || 0,
               media: issue.media_url ? { type: "image", url: issue.media_url } : null,
+              feedbackGiven: issue.feedbackGiven || false,
             })) || [];
           if (user?.uid && issues?.length) {
             const voteChecks = await Promise.all(
@@ -373,6 +375,15 @@ const MyIssues = () => {
                           <span className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full">
                             {post.repostCount} similar reports
                           </span>
+                        )}
+                        {activeTab === "issues" && post.status === "resolved" && !post.feedbackGiven && (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); navigate(`/feed/post/${post.id}`); }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
+                          >
+                            <Star size={12} /> Give Feedback
+                          </button>
                         )}
                       </>
                     }

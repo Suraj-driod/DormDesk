@@ -242,13 +242,14 @@ const PostDetailBase = ({
 
       <div className="max-w-3xl mx-auto px-4 py-6">
         {/* Main Post Content */}
-        {postSlot || (
-          <PostBase
-            {...post}
-            onCommentClick={undefined}
-            className="shadow-none border-0 bg-white"
-          />
-        )}
+        <PostBase
+          {...post}
+          onCommentClick={undefined}
+          className="shadow-none border-0 bg-white"
+        />
+
+        {/* Extension slot (feedback forms, proof previews, etc.) */}
+        {postSlot}
 
         {/* Comments Section */}
         <div className="mt-6 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.08)] border border-gray-100 overflow-hidden">

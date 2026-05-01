@@ -2,14 +2,14 @@ import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, Globe, Lock, MapPin, Download, Filter, RefreshCw,
-  UserPlus, X, User, Briefcase, CheckCircle
+  UserPlus, X, User, Briefcase, CheckCircle, Eye, XCircle
 } from "lucide-react";
 
 import { SelectBetter } from "../../UI/SelectBetter"; 
 import { BadgeBetter1 } from "../../UI/BadgeBetter";
 import { AlertModal } from "../../UI/Glow";
 import Heatmap from "../../components/Heatmap/Heatmap";
-import { fetchIssues, updateIssueStatus, updateIssuePriority, assignIssue } from "../../services/issues.service";
+import { fetchIssues, updateIssueStatus, updateIssuePriority, assignIssue, approveResolutionProof, rejectResolutionProof } from "../../services/issues.service";
 import { fetchCaretakers } from "../../services/profile.service";
 import { useAuth } from "../../auth/AuthContext";
 import { useAlert } from "../../hooks/useAlert";
@@ -134,6 +134,48 @@ const IssuesAdmin = () => {
       showError("Failed to assign caretaker. Please try again.");
     } finally {
       setAssigning(false);
+    }
+  };
+
+  // ── Proof review state ─────────────────────────────────────────────────────
+  const [proofModalOpen, setProofModalOpen] = useState(false);
+  const [proofIssue, setProofIssue] = useState(null);
+  const [proofActioning, setProofActioning] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+
+  const openProofReview = (issue) => {
+    setProofIssue(issue);
+    setProofModalOpen(true);
+  };
+
+  const handleApproveProof = async () => {
+    if (!proofIssue) return;
+    setProofActioning(true);
+    try {
+      const updated = await approveResolutionProof(proofIssue.id, user?.uid ?? profile?.id ?? profile?.managementDocId);
+      setIssues(prev => prev.map(i => i.id === proofIssue.id ? { ...i, ...updated } : i));
+      setProofModalOpen(false);
+      showSuccess("Proof approved — issue marked as resolved.");
+    } catch (err) {
+      showError(err.message || "Failed to approve proof");
+    } finally {
+      setProofActioning(false);
+    }
+  };
+
+  const handleRejectProof = async () => {
+    const reason = prompt("Enter reason for rejection:");
+    if (!reason) return;
+    setProofActioning(true);
+    try {
+      const updated = await rejectResolutionProof(proofIssue.id, user?.uid ?? profile?.id ?? profile?.managementDocId, reason);
+      setIssues(prev => prev.map(i => i.id === proofIssue.id ? { ...i, ...updated } : i));
+      setProofModalOpen(false);
+      showSuccess("Proof rejected — caretaker notified.");
+    } catch (err) {
+      showError(err.message || "Failed to reject proof");
+    } finally {
+      setProofActioning(false);
     }
   };
 
@@ -322,6 +364,7 @@ const IssuesAdmin = () => {
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Reported By</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned To</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Proof</th>
                     <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
                   </tr>
                 </thead>
@@ -398,9 +441,31 @@ const IssuesAdmin = () => {
                         <BadgeBetter1 status={issue.status} />
                       </td>
 
+                      {/* Proof column */}
+                      <td className="px-6 py-4">
+                        {issue.proofSubmission?.status === "pending" ? (
+                          <button
+                            onClick={() => openProofReview(issue)}
+                            className="flex items-center gap-1.5 text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-full text-xs font-semibold border border-amber-200 transition-colors"
+                          >
+                            <Eye size={13} /> Review Proof
+                          </button>
+                        ) : issue.proofUrl ? (
+                          <button
+                            onClick={() => setSelectedMedia({ url: issue.proofUrl, type: issue.proofSubmission?.resourceType || "image" })}
+                            className="flex items-center gap-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-full text-xs font-medium border border-blue-200 transition-colors"
+                          >
+                            <Eye size={13} /> View Proof
+                          </button>
+                        ) : issue.proofSubmission?.status === "rejected" ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">Rejected</span>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">—</span>
+                        )}
+                      </td>
+
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {/* Assign / Reassign button */}
                           <button
                             onClick={() => {
                               setSelectedIssue(issue);
@@ -418,7 +483,6 @@ const IssuesAdmin = () => {
                             {issue.assigned_to ? "Reassign" : "Assign"}
                           </button>
 
-                          {/* Status quick-change */}
                           <select
                             value={issue.status}
                             onChange={(e) => handleStatusChange(issue, e.target.value)}
@@ -427,7 +491,7 @@ const IssuesAdmin = () => {
                             <option value="reported">Reported</option>
                             <option value="assigned">Assigned</option>
                             <option value="in_progress">In Progress</option>
-                            <option value="resolved">Resolved</option>
+                            <option value="resolved" disabled>Resolved (via proof)</option>
                             <option value="closed">Closed</option>
                           </select>
                         </div>
@@ -584,6 +648,114 @@ const IssuesAdmin = () => {
                     </>
                   )}
                 </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Proof Review Modal ────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {proofModalOpen && proofIssue && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setProofModalOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 10 }}
+              transition={{ type: "spring", bounce: 0.25, duration: 0.35 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            >
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">Review Proof</h2>
+                  <p className="text-xs text-gray-400 mt-0.5">{proofIssue.title}</p>
+                </div>
+                <button onClick={() => setProofModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                  <X size={18} className="text-gray-500" />
+                </button>
+              </div>
+
+              <div className="bg-black flex justify-center items-center max-h-[400px]">
+                {proofIssue.proofSubmission?.resourceType === "video" ? (
+                  <video src={proofIssue.proofSubmission.url} controls className="max-h-[400px] max-w-full" />
+                ) : (
+                  <img src={proofIssue.proofSubmission?.url} alt="Proof" className="max-h-[400px] max-w-full object-contain" />
+                )}
+              </div>
+
+              {proofIssue.proofSubmission?.comment && (
+                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
+                  <p className="text-xs text-gray-500 font-medium mb-1">Caretaker's Comment</p>
+                  <p className="text-sm text-gray-700">{proofIssue.proofSubmission.comment}</p>
+                </div>
+              )}
+
+              <div className="px-6 py-3 border-t border-gray-100 text-xs text-gray-400">
+                Submitted {proofIssue.proofSubmission?.submittedAt ? new Date(proofIssue.proofSubmission.submittedAt).toLocaleString() : "—"}
+                {proofIssue.assigned_profile && ` by ${proofIssue.assigned_profile.full_name || proofIssue.assigned_profile.name || "Caretaker"}`}
+              </div>
+
+              <div className="px-6 pb-6 pt-3 flex gap-3">
+                <button
+                  onClick={handleRejectProof}
+                  disabled={proofActioning}
+                  className="flex-1 px-4 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <XCircle size={16} /> Reject
+                </button>
+                <button
+                  onClick={handleApproveProof}
+                  disabled={proofActioning}
+                  className="flex-1 px-4 py-3 bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                >
+                  {proofActioning ? (
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <CheckCircle size={16} />
+                  )}
+                  Approve
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Media Preview Modal ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {selectedMedia && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setSelectedMedia(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              className="bg-white rounded-2xl overflow-hidden max-w-3xl w-full max-h-[80vh] relative shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 className="font-semibold text-gray-800">Proof of Work</h3>
+                <button onClick={() => setSelectedMedia(null)} className="p-1 hover:bg-gray-200 rounded-full transition-colors">
+                  <X size={24} className="text-gray-500" />
+                </button>
+              </div>
+              <div className="p-0 bg-black flex justify-center items-center h-[500px]">
+                {selectedMedia.type === "video" ? (
+                  <video src={selectedMedia.url} controls className="max-h-full max-w-full" />
+                ) : (
+                  <img src={selectedMedia.url} alt="Proof" className="max-h-full max-w-full object-contain" />
+                )}
               </div>
             </motion.div>
           </motion.div>

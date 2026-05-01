@@ -17,6 +17,7 @@ import { processNewIssue } from "./geminiSimilarity.service";
 import { withHostelFilter } from "../Lib/utilities";
 import { createNotification } from "./notificationService";
 import { applyRule3 } from "./escalationService";
+import { uploadMedia } from "./mediaService";
 
 const ISSUES_COLLECTION = "issues";
 
@@ -462,4 +463,300 @@ export const fetchPendingIssues = async (hostelId) => {
   }));
 
   return issues.filter(Boolean);
+};
+
+// ── Resolution proof workflow ─────────────────────────────────────────────────
+
+export const submitResolutionProof = async (issueId, { file, comment }, caretakerUid) => {
+  const issueRef = doc(db, ISSUES_COLLECTION, issueId);
+  const issueSnap = await getDoc(issueRef);
+  if (!issueSnap.exists()) throw new Error("Issue not found");
+
+  const issue = issueSnap.data();
+  if (issue.assigned_to !== caretakerUid) throw new Error("You are not assigned to this issue");
+
+  const media = await uploadMedia(file);
+
+  const proofSubmission = {
+    url: media.url,
+    resourceType: media.resourceType,
+    publicId: media.publicId,
+    comment: comment || null,
+    submittedBy: caretakerUid,
+    submittedAt: new Date().toISOString(),
+    status: "pending",
+  };
+
+  const updateData = { proofSubmission };
+  if (issue.status === "assigned") updateData.status = "in_progress";
+
+  await updateDoc(issueRef, updateData);
+
+  const logsRef = collection(db, "issue_status_logs");
+  await addDoc(logsRef, {
+    issue_id: issueId,
+    old_status: issue.status,
+    new_status: updateData.status || issue.status,
+    changed_by: caretakerUid,
+    note: "Proof submitted — awaiting admin approval",
+    changed_at: new Date().toISOString(),
+  });
+
+  // Notify all admins in the hostel would require a query; notify via hostel admin shortcut
+  if (issue.hostelId) {
+    createNotification(
+      null, // userId null — will be picked up by admin listeners if you add hostel-wide notif support
+      issue.hostelId,
+      "proof_submitted",
+      "Proof Submitted",
+      `Caretaker submitted proof for "${issue.title || "Untitled"}"`,
+      issueId
+    );
+  }
+
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
+};
+
+export const approveResolutionProof = async (issueId, adminUid) => {
+  const issueRef = doc(db, ISSUES_COLLECTION, issueId);
+  const issueSnap = await getDoc(issueRef);
+  if (!issueSnap.exists()) throw new Error("Issue not found");
+
+  const issue = issueSnap.data();
+  if (!issue.proofSubmission || issue.proofSubmission.status !== "pending") {
+    throw new Error("No pending proof to approve");
+  }
+
+  const now = new Date().toISOString();
+  await updateDoc(issueRef, {
+    status: "resolved",
+    proofUrl: issue.proofSubmission.url,
+    resolvedBy: issue.assigned_to || adminUid,
+    resolvedAt: now,
+    resolved_at: now,
+    "proofSubmission.status": "approved",
+    "proofSubmission.reviewedBy": adminUid,
+    "proofSubmission.reviewedAt": now,
+  });
+
+  const logsRef = collection(db, "issue_status_logs");
+  await addDoc(logsRef, {
+    issue_id: issueId,
+    old_status: issue.status,
+    new_status: "resolved",
+    changed_by: adminUid,
+    note: "Admin approved proof — issue resolved",
+    changed_at: now,
+  });
+
+  if (issue.created_by) {
+    createNotification(
+      issue.created_by,
+      issue.hostelId || null,
+      "status_change",
+      "Issue Resolved",
+      `Your issue "${issue.title || "Untitled"}" has been resolved. Please give feedback.`,
+      issueId
+    );
+  }
+
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
+};
+
+export const rejectResolutionProof = async (issueId, adminUid, reason) => {
+  const issueRef = doc(db, ISSUES_COLLECTION, issueId);
+  const issueSnap = await getDoc(issueRef);
+  if (!issueSnap.exists()) throw new Error("Issue not found");
+
+  const issue = issueSnap.data();
+  if (!issue.proofSubmission || issue.proofSubmission.status !== "pending") {
+    throw new Error("No pending proof to reject");
+  }
+
+  const now = new Date().toISOString();
+  await updateDoc(issueRef, {
+    "proofSubmission.status": "rejected",
+    "proofSubmission.reviewedBy": adminUid,
+    "proofSubmission.reviewedAt": now,
+    "proofSubmission.rejectionReason": reason || "No reason provided",
+  });
+
+  const logsRef = collection(db, "issue_status_logs");
+  await addDoc(logsRef, {
+    issue_id: issueId,
+    old_status: issue.status,
+    new_status: issue.status,
+    changed_by: adminUid,
+    note: `Proof rejected: ${reason || "No reason provided"}`,
+    changed_at: now,
+  });
+
+  if (issue.assigned_to) {
+    createNotification(
+      issue.assigned_to,
+      issue.hostelId || null,
+      "proof_rejected",
+      "Proof Rejected",
+      `Your proof for "${issue.title || "Untitled"}" was rejected: ${reason || "No reason"}. Please resubmit.`,
+      issueId
+    );
+  }
+
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
+};
+
+// ── Student feedback ──────────────────────────────────────────────────────────
+
+export const submitIssueFeedback = async (issueId, studentUid, { rating, satisfaction, comment }) => {
+  const issueRef = doc(db, ISSUES_COLLECTION, issueId);
+  const issueSnap = await getDoc(issueRef);
+  if (!issueSnap.exists()) throw new Error("Issue not found");
+
+  const issue = issueSnap.data();
+  if (issue.created_by !== studentUid) throw new Error("Only the reporter can give feedback");
+  if (issue.status !== "resolved") throw new Error("Feedback is only allowed on resolved issues");
+  if (issue.feedbackGiven) throw new Error("Feedback already submitted");
+
+  if (!rating || rating < 1 || rating > 5) throw new Error("Rating must be 1–5");
+  if (!["satisfied", "not_satisfied"].includes(satisfaction)) throw new Error("Invalid satisfaction value");
+
+  const now = new Date().toISOString();
+  const isPositive = rating >= 4 && satisfaction === "satisfied";
+  const newStatus = isPositive ? "closed" : "resolved";
+
+  const updateData = {
+    feedback: {
+      rating,
+      satisfaction,
+      comment: comment || null,
+      submittedAt: now,
+      submittedBy: studentUid,
+    },
+    feedbackGiven: true,
+  };
+
+  if (isPositive) {
+    updateData.status = "closed";
+    updateData.closedAt = now;
+    updateData.feedbackReview = {
+      outcome: "positive",
+      reviewedBy: "auto",
+      reviewedAt: now,
+      note: "Auto-closed: rating >= 4 and satisfied",
+    };
+  }
+
+  await updateDoc(issueRef, updateData);
+
+  const logsRef = collection(db, "issue_status_logs");
+  await addDoc(logsRef, {
+    issue_id: issueId,
+    old_status: "resolved",
+    new_status: newStatus,
+    changed_by: studentUid,
+    note: isPositive
+      ? `Feedback submitted (${rating}/5, ${satisfaction}) — auto-closed`
+      : `Feedback submitted — ${satisfaction}, ${rating}/5 — pending admin review`,
+    changed_at: now,
+  });
+
+  if (isPositive && issue.created_by) {
+    createNotification(
+      issue.created_by,
+      issue.hostelId || null,
+      "status_change",
+      "Issue Closed",
+      `Your issue "${issue.title || "Untitled"}" has been closed. Thank you for your feedback!`,
+      issueId
+    );
+  }
+
+  if (!isPositive && issue.hostelId) {
+    createNotification(
+      null,
+      issue.hostelId,
+      "feedback_submitted",
+      "Negative Feedback Received",
+      `Student rated "${issue.title || "Untitled"}" ${rating}/5 — ${satisfaction}. Review required.`,
+      issueId
+    );
+  }
+
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
+};
+
+// ── Admin feedback adjudication ───────────────────────────────────────────────
+
+export const adminReviewIssueFeedback = async (issueId, adminUid, outcome, note) => {
+  const issueRef = doc(db, ISSUES_COLLECTION, issueId);
+  const issueSnap = await getDoc(issueRef);
+  if (!issueSnap.exists()) throw new Error("Issue not found");
+
+  const issue = issueSnap.data();
+  if (!issue.feedbackGiven) throw new Error("No feedback to review");
+  if (!["positive", "negative"].includes(outcome)) throw new Error("Outcome must be positive or negative");
+
+  const now = new Date().toISOString();
+  const updateData = {
+    feedbackReview: {
+      outcome,
+      reviewedBy: adminUid,
+      reviewedAt: now,
+      note: note || null,
+    },
+  };
+
+  if (outcome === "positive") {
+    updateData.status = "closed";
+    updateData.closedAt = now;
+  } else {
+    // Negative — reopen for rework
+    updateData.status = "in_progress";
+    updateData.feedbackGiven = false;
+    updateData.feedback = null;
+    updateData.proofUrl = null;
+    updateData.proofSubmission = null;
+    updateData.resolvedAt = null;
+    updateData.resolved_at = null;
+    updateData.resolvedBy = null;
+  }
+
+  await updateDoc(issueRef, updateData);
+
+  const logsRef = collection(db, "issue_status_logs");
+  await addDoc(logsRef, {
+    issue_id: issueId,
+    old_status: issue.status,
+    new_status: updateData.status,
+    changed_by: adminUid,
+    note: outcome === "positive"
+      ? "Admin accepted feedback — issue closed"
+      : `Admin reopened issue (negative feedback): ${note || ""}`,
+    changed_at: now,
+  });
+
+  if (issue.created_by) {
+    const msg = outcome === "positive"
+      ? `Your issue "${issue.title || "Untitled"}" is now closed. Thank you for your feedback!`
+      : `Your issue "${issue.title || "Untitled"}" has been reopened based on your feedback.`;
+    createNotification(issue.created_by, issue.hostelId || null, "status_change", "Issue Update", msg, issueId);
+  }
+
+  if (outcome === "negative" && issue.assigned_to) {
+    createNotification(
+      issue.assigned_to,
+      issue.hostelId || null,
+      "issue_reopened",
+      "Issue Reopened",
+      `Issue "${issue.title || "Untitled"}" was reopened after negative feedback. Please fix and resubmit proof.`,
+      issueId
+    );
+  }
+
+  const updatedSnap = await getDoc(issueRef);
+  return { id: updatedSnap.id, ...updatedSnap.data() };
 };

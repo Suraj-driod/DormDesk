@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import { 
   Home, LayoutDashboard, ClipboardList, Megaphone, Plus, Users, User,
   Settings, Search, AlertTriangle, FileText, Briefcase, Eye, FolderOpen,
-  BarChart3
+  BarChart3, MessageSquare
 } from "lucide-react";
 
 export function Sidebar({
@@ -23,6 +23,7 @@ export function Sidebar({
         { key: "/", label: "Dashboard", icon: LayoutDashboard },
         { key: "/admin/issues", label: "Manage Issues", icon: ClipboardList },
         { key: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+        { key: "/admin/issue-feedback", label: "Feedback", icon: MessageSquare },
         { key: "/admin/announcements", label: "Announcements", icon: Megaphone },
         { key: "/admin/lost", label: "Lost & Found", icon: Search },
         { key: "/admin/cases", label: "Case Assignment", icon: Briefcase },

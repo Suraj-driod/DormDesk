@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Users, Megaphone, AlertTriangle, Search, 
-  ChevronLeft, ChevronRight, Clock, TrendingUp 
+  ChevronLeft, ChevronRight, Clock, TrendingUp, Star 
 } from "lucide-react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import { useAuth } from "../../auth/AuthContext";
 import { withHostelFilter } from "../../Lib/utilities";
@@ -29,6 +29,26 @@ export default function Dashboard() {
   const [bgIndex, setBgIndex] = useState(0);
   const [slides, setSlides] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pendingFeedback, setPendingFeedback] = useState([]);
+
+  // Fetch issues awaiting feedback for students
+  useEffect(() => {
+    if (!authLoading && user && isStudent) {
+      (async () => {
+        try {
+          const issuesRef = collection(db, "issues");
+          const q = query(issuesRef, where("created_by", "==", user.uid), where("status", "==", "resolved"));
+          const snap = await getDocs(q);
+          const awaiting = snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((i) => !i.feedbackGiven);
+          setPendingFeedback(awaiting);
+        } catch (e) {
+          console.warn("Could not fetch pending feedback:", e);
+        }
+      })();
+    }
+  }, [authLoading, user, isStudent]);
 
   // Fetch dynamic slide data - wait for auth
   useEffect(() => {
@@ -309,6 +329,44 @@ export default function Dashboard() {
         >
           <Heatmap />
         </motion.div>
+
+        {/* Awaiting Feedback (Students) */}
+        {isStudent && pendingFeedback.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="mb-6"
+          >
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-amber-800 mb-3 flex items-center gap-2">
+                <Star size={16} className="text-amber-500" /> Awaiting Your Feedback
+              </h3>
+              <div className="space-y-2">
+                {pendingFeedback.slice(0, 3).map((issue) => (
+                  <button
+                    key={issue.id}
+                    onClick={() => navigate(`/feed/post/${issue.id}`)}
+                    className="w-full flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-amber-100 hover:border-amber-300 transition-colors text-left"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{issue.title}</p>
+                      <p className="text-xs text-gray-500 capitalize">{issue.category}</p>
+                    </div>
+                    <span className="ml-3 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 whitespace-nowrap flex items-center gap-1">
+                      <Star size={10} /> Rate
+                    </span>
+                  </button>
+                ))}
+                {pendingFeedback.length > 3 && (
+                  <p className="text-xs text-amber-600 text-center mt-1">
+                    +{pendingFeedback.length - 3} more awaiting feedback
+                  </p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Quick Actions Grid */}
         <motion.div
