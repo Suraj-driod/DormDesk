@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  UserPlus, Sparkles, ChevronDown, Shield, GraduationCap,
+  UserPlus, Sparkles, Shield, GraduationCap,
   KeyRound, Building2, Layers, Hash, CheckCircle2
 } from "lucide-react";
 import { TextInput, ImageUpload } from '../../components/core';
@@ -29,10 +29,11 @@ const StudentRegistration = ({ onSwitchToAdmin }) => {
     hostelId: '', floor: '', flatNumber: ''
   });
   const [idCardImage, setIdCardImage] = useState(null);
+  const [userTouched, setUserTouched] = useState({ fullName: false, email: false });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [formVisible, setFormVisible] = useState(false);
+  const [formVisible, setFormVisible] = useState(true);
   const [toastMessage, setToastMessage] = useState(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
@@ -81,6 +82,10 @@ const StudentRegistration = ({ onSwitchToAdmin }) => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    // Mark field as user-touched so AI scan won't overwrite it
+    if (name === 'fullName' || name === 'email') {
+      setUserTouched(p => ({ ...p, [name]: true }));
+    }
     setFormData(p => {
       const next = { ...p, [name]: value };
       // Reset dependent dropdowns
@@ -93,12 +98,18 @@ const StudentRegistration = ({ onSwitchToAdmin }) => {
 
   const handleImageUpload = async (file, preview) => {
     setIdCardImage({ file, preview });
+    // Reset user-touched flags so scan can auto-fill cleanly on new upload
+    setUserTouched({ fullName: false, email: false });
     if (file) {
-      setFormVisible(true); setIsScanning(true); setToastMessage("Scanning ID card...");
+      setIsScanning(true); setToastMessage("Scanning ID card...");
       try {
         const scannedData = await scanIdCard(file);
         if (scannedData) {
-          setFormData(p => ({ ...p, fullName: scannedData.fullName || p.fullName, email: scannedData.email || p.email }));
+          setFormData(p => ({
+            ...p,
+            fullName: (!userTouched.fullName && scannedData.fullName) ? scannedData.fullName : p.fullName,
+            email:    (!userTouched.email    && scannedData.email)    ? scannedData.email    : p.email,
+          }));
           setToastMessage("Details extracted!");
         } else setToastMessage("Could not extract details. Fill manually.");
       } catch { setToastMessage("Scan failed. Fill manually."); } finally { setIsScanning(false); }
@@ -115,7 +126,7 @@ const StudentRegistration = ({ onSwitchToAdmin }) => {
     if (!formData.floor) ne.floor = 'Please select a floor';
     if (!formData.flatNumber) ne.flatNumber = 'Please select a flat';
     if (!formData.password) ne.password = 'Password is required';
-    if (!idCardImage) ne.idCard = 'ID Card image is required';
+    // ID card is optional — no validation needed
     if (Object.keys(ne).length > 0) { setErrors(ne); setIsSubmitting(false); setToastMessage("Please fix the errors."); return; }
 
     try {
@@ -148,12 +159,12 @@ const StudentRegistration = ({ onSwitchToAdmin }) => {
         </motion.div>
         <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
           <motion.section layout className={`relative bg-white/40 rounded-2xl p-4 border transition-colors ${errors.idCard ? 'border-red-300 bg-red-50/30' : 'border-[#E6FBFF]'} ${isScanning ? 'ring-2 ring-[#00B8D4] ring-opacity-50' : ''}`}>
-            <ImageUpload label="Upload Hostel ID Card" helperText="Full Name and Email will be auto-filled using AI" onChange={handleImageUpload} required />
+            <ImageUpload label="Upload Hostel ID Card (Optional)" helperText="Full Name and Email will be auto-filled using AI" onChange={handleImageUpload} />
             {errors.idCard && <p className="text-xs text-red-500 mt-2 ml-2">{errors.idCard}</p>}
-            {isScanning && (<div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center z-10"><div className="flex items-center gap-2 text-[#00B8D4] font-semibold animate-pulse"><Sparkles size={20} /><span>AI is scanning ID...</span></div></div>)}
+            {isScanning && (<div className="absolute inset-0 bg-white/80 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center z-10 pointer-events-none"><div className="flex items-center gap-2 text-[#00B8D4] font-semibold animate-pulse"><Sparkles size={20} /><span>AI is scanning ID...</span></div></div>)}
           </motion.section>
-          <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="flex items-center gap-4 text-[#94A3B8] text-xs uppercase tracking-wider font-semibold cursor-pointer group" onClick={() => setFormVisible(true)}>
-            <div className="flex-1 h-px bg-[#E2E8F0] group-hover:bg-[#00B8D4] transition-colors" /><span className="group-hover:text-[#00B8D4] transition-colors flex items-center gap-1">OR FILL MANUALLY {!formVisible && <ChevronDown size={14} />}</span><div className="flex-1 h-px bg-[#E2E8F0] group-hover:bg-[#00B8D4] transition-colors" />
+          <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="flex items-center gap-4 text-[#94A3B8] text-xs uppercase tracking-wider font-semibold">
+            <div className="flex-1 h-px bg-[#E2E8F0]" /><span className="flex items-center gap-1">OR FILL MANUALLY</span><div className="flex-1 h-px bg-[#E2E8F0]" />
           </motion.div>
           <AnimatePresence>
             {formVisible && (
