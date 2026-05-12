@@ -35,3 +35,80 @@
 body {
   font-family: var(--font-ui);
 }
+
+/* ─── Sonner Toast Overrides — DormDesk Cyan Theme ─── */
+
+/* Base toast container tweaks */
+[data-sonner-toaster] {
+  --width: 380px;
+  font-family: var(--font-ui) !important;
+}
+
+/* Info toast — cyan accent (matches theme primary) */
+[data-sonner-toast][data-type="info"] {
+  background: rgba(224, 247, 250, 0.9) !important;
+  border: 1px solid rgba(0, 229, 255, 0.4) !important;
+  box-shadow: 0 8px 32px rgba(0, 229, 255, 0.2), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  color: #006064 !important;
+}
+
+/* Success toast — green accent */
+[data-sonner-toast][data-type="success"] {
+  background: rgba(232, 245, 233, 0.9) !important;
+  border: 1px solid rgba(0, 200, 83, 0.35) !important;
+  box-shadow: 0 8px 32px rgba(0, 200, 83, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  color: #1B5E20 !important;
+}
+
+/* Warning toast — amber accent */
+[data-sonner-toast][data-type="warning"] {
+  background: rgba(255, 243, 224, 0.92) !important;
+  border: 1px solid rgba(255, 152, 0, 0.35) !important;
+  box-shadow: 0 8px 32px rgba(255, 152, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  color: #E65100 !important;
+}
+
+/* Error toast — red accent */
+[data-sonner-toast][data-type="error"] {
+  background: rgba(255, 235, 238, 0.92) !important;
+  border: 1px solid rgba(244, 67, 54, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(244, 67, 54, 0.18), 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  color: #B71C1C !important;
+}
+
+/* Action buttons — neon cyan theme */
+[data-sonner-toast] [data-button] {
+  background: linear-gradient(135deg, #00E5FF, #00B8D4) !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  border-radius: 9999px !important;
+  padding: 6px 14px !important;
+  border: none !important;
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.35) !important;
+  transition: all 0.2s ease !important;
+}
+[data-sonner-toast] [data-button]:hover {
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.6) !important;
+  transform: translateY(-1px);
+}
+
+/* Close button styling */
+[data-sonner-toast] [data-close-button] {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(0, 229, 255, 0.25) !important;
+  color: #616161 !important;
+  border-radius: 50% !important;
+  transition: all 0.2s ease !important;
+}
+[data-sonner-toast] [data-close-button]:hover {
+  background: rgba(0, 229, 255, 0.15) !important;
+  color: #00B8D4 !important;
+  border-color: rgba(0, 229, 255, 0.5) !important;
+}
+
+/* Toast description text */
+[data-sonner-toast] [data-description] {
+  color: inherit !important;
+  opacity: 0.85;
+}

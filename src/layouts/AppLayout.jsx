@@ -5,10 +5,14 @@ import {Sidebar} from "../pages/Wrapper/Sidebar";
 import {Footer} from "../pages/Wrapper/Footer";
 import { useAuth } from "../auth/AuthContext";
 import { runEscalationCheck } from "../services/escalationService";
+import { useToastListeners } from '../hooks/useToastListeners';
 
 const AppLayout = () => {
   const { user, profile, logout } = useAuth(); 
   // profile.role → "admin" | "caretaker" | "student"
+
+  // Wire up real-time toast notifications based on role
+  useToastListeners();
 
   const location = useLocation();
   const navigate = useNavigate();

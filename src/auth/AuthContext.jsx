@@ -23,6 +23,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { clearToastCache } from "../services/toastService";
 
 const AuthContext = createContext(null);
 
@@ -279,6 +280,7 @@ export const AuthProvider = ({ children }) => {
 
   // Logout
   const logout = async () => {
+    clearToastCache();
     setProfile(null);
     return await signOut(auth);
   };
