@@ -12,7 +12,7 @@ const Login = () => {
   const location = useLocation();
 
   // Get redirect path from location state or default to dashboard
-  const from = location.state?.from?.pathname || "/";
+  const from = location.state?.from?.pathname || "/dashboard";
 
   // Check for disabled caretaker message
   const disabledMessage = location.state?.disabledMessage || null;

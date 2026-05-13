@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import LandingPage from "./pages/Landing/LandingPage";
+import HostelProfile from "./pages/HostelProfile/HostelProfile";
 import {
   Register,
   Login,
@@ -44,6 +46,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public routes - no layout */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/hostel/:hostelId" element={<HostelProfile />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
@@ -56,7 +60,7 @@ function App() {
             }
           >
             {/* Common Routes - All authenticated users */}
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/feed/post/:type/:id" element={<PostDetail />} />
             <Route path="/feed/post/:id" element={<PostDetail />} />

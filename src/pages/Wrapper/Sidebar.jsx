@@ -20,7 +20,7 @@ export function Sidebar({
   const items = useMemo(() => {
     if (role === "admin") {
       return [
-        { key: "/", label: "Dashboard", icon: LayoutDashboard },
+        { key: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { key: "/admin/issues", label: "Manage Issues", icon: ClipboardList },
         { key: "/admin/analytics", label: "Analytics", icon: BarChart3 },
         { key: "/admin/issue-feedback", label: "Feedback", icon: MessageSquare },
@@ -36,7 +36,7 @@ export function Sidebar({
     
     if (role === "caretaker") {
       return [
-        { key: "/", label: "Dashboard", icon: LayoutDashboard },
+        { key: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { key: "/caretaker/assignments", label: "My Assignments", icon: Briefcase },
         { key: "/caretaker/feed", label: "Campus Feed", icon: Eye },
         { key: "/profile", label: "Profile", icon: User },
@@ -45,7 +45,7 @@ export function Sidebar({
     
     // Student (default)
     return [
-      { key: "/", label: "Home", icon: Home },
+      { key: "/dashboard", label: "Home", icon: Home },
       { key: "/feed", label: "Campus Feed", icon: Users },
       { key: "/my-issues", label: "My Issues", icon: FolderOpen },
       { key: "/report-issue", label: "Report Issue", icon: Plus },

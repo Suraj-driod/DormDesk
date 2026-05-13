@@ -64,7 +64,7 @@ export const RequireCaretaker = ({ children }) => {
             This page is restricted to caretakers only.
           </p>
           <Link 
-            to="/"
+            to="/dashboard"
             className="inline-block px-6 py-3 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-colors"
           >
             Go to Dashboard

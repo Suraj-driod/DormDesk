@@ -52,7 +52,7 @@ export const RequireRole = ({ children, allowedRoles = [] }) => {
             You don't have permission to access this page.
           </p>
           <Link 
-            to="/"
+            to="/dashboard"
             className="inline-block px-6 py-3 bg-gray-900 text-white rounded-full font-semibold hover:bg-gray-800 transition-colors"
           >
             Go to Dashboard

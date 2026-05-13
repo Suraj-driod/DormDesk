@@ -22,7 +22,7 @@ import { auth } from '../../firebase';
 const StudentRegistration = ({ onSwitchToAdmin }) => {
   const { signUp, user, loading } = useAuth();
   const navigate = useNavigate();
-  useEffect(() => { if (!loading && user) navigate('/', { replace: true }); }, [user, loading, navigate]);
+  useEffect(() => { if (!loading && user) navigate('/dashboard', { replace: true }); }, [user, loading, navigate]);
 
   const [formData, setFormData] = useState({
     fullName: '', phone: '', email: '', password: '',
@@ -269,7 +269,7 @@ const NUMBERING_OPTIONS = [
 function AdminRegistration({ onSwitchToStudent }) {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  useEffect(() => { if (!loading && user) navigate('/', { replace: true }); }, [user, loading, navigate]);
+  useEffect(() => { if (!loading && user) navigate('/dashboard', { replace: true }); }, [user, loading, navigate]);
 
   // ─── Multi-step state ───
   const [step, setStep] = useState(1); // 1 = key, 2 = hostel setup + personal, 3 = done
